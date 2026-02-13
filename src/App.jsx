@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAppState } from './hooks/useAppState.js';
+import { useSync } from './hooks/useSync.js';
 import AccountSwitcher from './components/AccountSwitcher/AccountSwitcher.jsx';
 import Tape, { computeRunningTotals } from './components/Tape/Tape.jsx';
 import SummaryTape from './components/SummaryTape/SummaryTape.jsx';
@@ -7,7 +8,9 @@ import NumberInput from './components/NumberInput/NumberInput.jsx';
 import styles from './App.module.css';
 
 export default function App() {
-  const { state, dispatch, activeAccount, activeSummary } = useAppState();
+  const { state, dispatch, rawDispatch, activeAccount, activeSummary } = useAppState();
+  const sync = useSync(state, rawDispatch);
+  const d = sync.syncDispatch;
   const [editingId, setEditingId] = useState(null);
 
   const viewingSummary = activeSummary !== null;
@@ -51,21 +54,21 @@ export default function App() {
         activeAccountId={state.activeAccountId}
         summaries={state.summaries || []}
         activeSummaryId={state.activeSummaryId}
-        dispatch={dispatch}
+        dispatch={d}
       />
       {viewingSummary ? (
-        <SummaryTape summary={activeSummary} accounts={state.accounts} settings={settings} dispatch={dispatch} />
+        <SummaryTape summary={activeSummary} accounts={state.accounts} settings={settings} dispatch={d} />
       ) : (
         <Tape
           tape={activeAccount.tape}
-          dispatch={dispatch}
+          dispatch={d}
           editingId={editingId}
           onSelect={setEditingId}
           settings={settings}
         />
       )}
       <NumberInput
-        dispatch={dispatch}
+        dispatch={d}
         editingEntry={editingEntry}
         onDoneEditing={() => setEditingId(null)}
         subtotal={subtotal}
@@ -78,6 +81,7 @@ export default function App() {
         appState={state}
         activeSummary={activeSummary}
         viewingSummary={viewingSummary}
+        sync={sync}
       />
     </div>
   );
