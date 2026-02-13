@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:valibot.dev)",
+      "Bash(npm create:*)",
+      "Bash(npm install:*)",
+      "Bash(npm cache clean:*)",
+      "Bash(npx vite build)",
+      "Bash(kill:*)",
+      "Bash(npx vite:*)",
+      "Bash(open:*)",
+      "Bash(npm run build:*)",
+      "Bash(git -C /Users/droste/Work/many-tapes-calculator status)",
+      "Bash(git -C /Users/droste/Work/many-tapes-calculator add .gitignore README.md eslint.config.js index.html package-lock.json package.json src/ vite.config.js .claude/)",
+      "Bash(git -C /Users/droste/Work/many-tapes-calculator commit -m \"$\\(cat <<''EOF''\nInitial commit: many-tapes calculator\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")"
+    ]
+  }
+}

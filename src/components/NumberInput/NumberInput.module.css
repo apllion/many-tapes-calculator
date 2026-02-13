@@ -1,0 +1,319 @@
+.container {
+  background: var(--color-surface);
+  padding: var(--space-sm) var(--space-md) var(--space-md);
+}
+
+.editing .display {
+  border-color: var(--color-accent);
+  background: #eef4ff;
+}
+
+.display {
+  font-family: var(--font-mono);
+  font-size: 1.5rem;
+  text-align: right;
+  padding: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-sm);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  min-height: 44px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+
+.subtotal {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  margin-right: auto;
+}
+
+.editing .subtotal {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--color-accent);
+  background: rgba(42, 107, 196, 0.1);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-auto-rows: 52px;
+  gap: var(--space-xs);
+  max-height: calc(5 * 52px + 4 * var(--space-xs));
+  overflow-y: auto;
+}
+
+.grid > button {
+  height: 52px;
+  border-radius: var(--radius);
+  font-size: 1.25rem;
+  font-weight: 600;
+  transition: background 0.1s;
+  text-transform: uppercase;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.grid > button:active {
+  transform: scale(0.96);
+}
+
+.numBtn {
+  background: var(--color-bg);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.numBtn:hover {
+  background: #e8e8e0;
+}
+
+.opBtn {
+  background: var(--color-accent);
+  color: white;
+}
+
+.opBtn:hover {
+  background: var(--color-accent-hover);
+}
+
+.fnBtn {
+  background: #ddd;
+  color: var(--color-text);
+}
+
+.fnBtn:hover {
+  background: #ccc;
+}
+
+.navBtn {
+  background: #9b59b6;
+  color: white;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  clip-path: polygon(0 0, 75% 0, 100% 50%, 75% 100%, 0 100%);
+  padding-right: 12px;
+}
+
+.navBtn:hover {
+  background: #8344a0;
+}
+
+.clearBtn {
+  background: #d44;
+  color: white;
+}
+
+.clearBtn:hover {
+  background: #b33;
+}
+
+.eqBtn {
+  background: var(--color-positive);
+  color: white;
+}
+
+.eqBtn:hover {
+  background: #1f6b1f;
+}
+
+.memBtn {
+  background: #e6a317;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 2px 4px;
+  overflow: hidden;
+}
+
+.memBtn:hover:not(:disabled) {
+  background: #cf9214;
+}
+
+.memBtnDisabled {
+  opacity: 0.45;
+}
+
+.memLabel {
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.memValue {
+  font-size: 0.6rem;
+  font-weight: 400;
+  line-height: 1;
+  opacity: 0.85;
+  font-family: var(--font-mono);
+}
+
+.memBtnEmpty {
+  background: transparent;
+  border: 1px dashed var(--color-border);
+  opacity: 0.3;
+}
+
+.textInput {
+  font-family: inherit;
+  font-size: inherit;
+  text-align: right;
+  border: none;
+  outline: none;
+  background: transparent;
+  width: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.textBtn {
+  background: #5b7fa5;
+  color: white;
+  font-size: 1rem;
+}
+
+.textBtn:hover {
+  background: #4a6b8a;
+}
+
+.textStoreBtn {
+  background: var(--color-bg);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  font-size: 0.65rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 4px;
+}
+
+.textStoreEmpty {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  opacity: 0.5;
+}
+
+.wideBtn {
+  background: var(--color-bg);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.wideBtn:hover {
+  background: #e8e8e0;
+}
+
+.toggleOn {
+  background: var(--color-accent);
+  color: white;
+  border-color: var(--color-accent);
+}
+
+.toggleOn:hover {
+  background: var(--color-accent-hover);
+}
+
+.colorBtn {
+  border: 2px solid var(--color-border);
+  color: white;
+  font-size: 1rem;
+}
+
+.colorBtn:hover {
+  opacity: 0.85;
+}
+
+.colorActive {
+  border-color: var(--color-text);
+  box-shadow: inset 0 0 0 2px white;
+}
+
+.savesList {
+  grid-column: span 4;
+  overflow-y: auto;
+  max-height: 220px;
+  display: flex;
+  flex-direction: column;
+}
+
+.saveItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg);
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  font-size: 0.85rem;
+  position: relative;
+}
+
+.saveItem::after {
+  content: '';
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-text-muted);
+  opacity: 0.4;
+}
+
+.saveItem:active {
+  background: #e8e8e0;
+}
+
+.saveName {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.saveDate {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  margin-left: var(--space-sm);
+  flex-shrink: 0;
+}
+
+.longPress {
+  position: relative;
+}
+
+.longPress::after {
+  content: '';
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.4;
+}
+
