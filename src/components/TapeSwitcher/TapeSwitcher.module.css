@@ -24,6 +24,20 @@
   transition: background 0.15s, color 0.15s;
 }
 
+.tabName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tabTotal {
+  display: none;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  opacity: 0.7;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
 .tab:hover {
   color: var(--color-text);
 }
@@ -73,13 +87,17 @@
   color: var(--color-accent);
 }
 
+.addTotalBtn {
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
 @media (orientation: landscape) {
   .container {
     overflow-x: visible;
     overflow-y: auto;
     padding: var(--space-sm);
     grid-row: 1 / -1;
-    width: 140px;
   }
 
   .tabs {
@@ -91,5 +109,9 @@
     font-size: 0.95rem;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .tabTotal {
+    display: block;
   }
 }

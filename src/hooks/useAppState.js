@@ -260,20 +260,6 @@ function localReducer(state, action) {
       }
       return state;
 
-    case 'SYNC_STATE': {
-      // Fix dangling pointers after receiving remote state
-      const tapeIds = new Set(state.tapes.map((a) => a.id));
-      const totalIds = new Set((state.totals || []).map((s) => s.id));
-      let next = state;
-      if (!tapeIds.has(next.activeTapeId)) {
-        next = { ...next, activeTapeId: state.tapes[0].id };
-      }
-      if (next.activeTotalId && !totalIds.has(next.activeTotalId)) {
-        next = { ...next, activeTotalId: null };
-      }
-      return next;
-    }
-
     case 'LOAD_STATE':
       return state; // LOAD_STATE fully replaces via sharedReducer, including activeTapeId
 
@@ -282,15 +268,27 @@ function localReducer(state, action) {
   }
 }
 
+function fixDanglingPointers(state) {
+  let next = state;
+  const tapeIds = new Set(state.tapes.map((a) => a.id));
+  const totalIds = new Set((state.totals || []).map((s) => s.id));
+  if (!tapeIds.has(next.activeTapeId)) {
+    next = { ...next, activeTapeId: state.tapes[0].id };
+  }
+  if (next.activeTotalId && !totalIds.has(next.activeTotalId)) {
+    next = { ...next, activeTotalId: null };
+  }
+  return next;
+}
+
 function reducer(state, action) {
   let next = sharedReducer(state, action);
   // Remote actions skip local view changes (each peer controls their own view)
   if (!action._remote) {
     next = localReducer(next, action);
-  } else if (action.type === 'SYNC_STATE') {
-    // SYNC_STATE always fixes dangling pointers, even from remote
-    next = localReducer(next, action);
   }
+  // Always fix dangling pointers after any state change
+  next = fixDanglingPointers(next);
   return next;
 }
 

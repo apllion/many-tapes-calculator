@@ -8,8 +8,8 @@ export default function TapeEntry({ entry, resolvedText, runningTotal, subProduc
   const displayValue = subProduct !== null ? subProduct : runningTotal;
   const isNegative = displayValue < 0;
   const totalClass = `${styles.total} ${isNegative ? styles.negative : styles.positive}`;
-  const isSub = entry.op === '-';
-  const colorSub = settings?.colorSubtractions && isSub;
+  const isNegativeValue = entry.value < 0;
+  const colorNeg = settings?.colorNegatives && isNegativeValue;
 
   if (entry.op === 'text') {
     return (
@@ -64,7 +64,7 @@ export default function TapeEntry({ entry, resolvedText, runningTotal, subProduc
 
   return (
     <div
-      className={`${styles.row} ${colorSub ? styles.subRow : ''} ${isSelected ? styles.selected : ''}`}
+      className={`${styles.row} ${colorNeg ? styles.negRow : ''} ${isSelected ? styles.selected : ''}`}
       onClick={onSelect}
     >
       <button

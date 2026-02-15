@@ -14,7 +14,8 @@ export default function App() {
   const d = sync.syncDispatch;
   const [editingId, setEditingId] = useState(null);
   const [totalConfigOpen, setTotalConfigOpen] = useState(false);
-
+  const [configRequest, setConfigRequest] = useState(null);
+  const [previewEntry, setPreviewEntry] = useState(null);
   // Autosave every 5 minutes, skip if nothing changed
   const lastAutosaveJson = useRef(null);
   useEffect(() => {
@@ -70,6 +71,9 @@ export default function App() {
         totals={state.totals || []}
         activeTotalId={state.activeTotalId}
         dispatch={d}
+        settings={settings}
+        onAddTape={() => { d({ type: 'ADD_TAPE' }); setConfigRequest('name'); }}
+        onAddTotal={() => { d({ type: 'ADD_TOTAL' }); setConfigRequest('total'); }}
       />
       {viewingTotal ? (
         <TotalTape total={activeTotal} tapes={state.tapes} settings={settings} dispatch={d} showDeselected={totalConfigOpen} />
@@ -80,6 +84,7 @@ export default function App() {
           editingId={editingId}
           onSelect={setEditingId}
           settings={settings}
+          previewEntry={previewEntry}
         />
       )}
       <NumberInput
@@ -98,6 +103,9 @@ export default function App() {
         viewingTotal={viewingTotal}
         sync={sync}
         onTotalConfigChange={setTotalConfigOpen}
+        configRequest={configRequest}
+        onConfigDone={() => setConfigRequest(null)}
+        onPreviewChange={setPreviewEntry}
       />
     </div>
   );

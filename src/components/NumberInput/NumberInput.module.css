@@ -1,3 +1,7 @@
+.textSidebar {
+  display: none;
+}
+
 .container {
   background: var(--color-surface);
   padding: var(--space-sm) var(--space-md) var(--space-md);
@@ -244,10 +248,40 @@
   box-shadow: inset 0 0 0 2px white;
 }
 
+.savesContainer {
+  display: flex;
+  flex-direction: column;
+  height: calc(5 * var(--btn-height) + 4 * var(--space-xs));
+  overflow: hidden;
+}
+
+.savesHeader {
+  display: flex;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-xs);
+}
+
+.savesHeader > button {
+  height: var(--btn-height);
+  border-radius: var(--radius);
+  font-size: 1.25rem;
+  font-weight: 600;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.savesHeader > button:first-child {
+  width: 25%;
+}
+
+.savesHeader > button:last-child {
+  flex: 1;
+}
+
 .savesList {
-  grid-column: span 4;
   overflow-y: auto;
-  max-height: 220px;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
@@ -269,16 +303,9 @@
   position: relative;
 }
 
-.saveItem::after {
-  content: '';
-  position: absolute;
-  bottom: 5px;
-  right: 5px;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--color-text-muted);
-  opacity: 0.4;
+.saveItem.longPress::after {
+  right: auto;
+  left: 5px;
 }
 
 .saveItem:active {
@@ -299,6 +326,20 @@
   font-size: 0.75rem;
   margin-left: var(--space-sm);
   flex-shrink: 0;
+}
+
+.saveDelete {
+  margin-left: var(--space-xs);
+  color: var(--color-text-muted);
+  font-size: 1rem;
+  opacity: 0.4;
+  flex-shrink: 0;
+  padding: 0 4px;
+}
+
+.saveDelete:hover {
+  opacity: 1;
+  color: var(--color-danger);
 }
 
 .longPress {
@@ -399,6 +440,30 @@
   .keypadRow > .grid {
     flex: 1;
     min-width: 0;
+  }
+
+  .textSidebar {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-xs);
+    min-width: 0;
+    padding: var(--space-sm) var(--space-xs) var(--space-sm) 0;
+    overflow-y: auto;
+    align-content: start;
+  }
+
+  .textSidebar > button:nth-child(1),
+  .textSidebar > button:nth-child(2) {
+    font-size: 0.75rem;
+  }
+
+  .textSidebar > button {
+    height: var(--btn-height);
+    border-radius: var(--radius);
+    font-weight: 600;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
   }
 }
 

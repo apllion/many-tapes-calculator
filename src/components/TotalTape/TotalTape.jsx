@@ -83,7 +83,7 @@ export default function TotalTape({ total, tapes, settings, dispatch, showDesele
           <span className={entryStyles.value} style={{ fontWeight: 700 }}>
             Total
           </span>
-          <span className={entryStyles.eqOp}>=</span>
+          <span />
           <span className={`${entryStyles.total} ${entryStyles.subtotalValue} ${totalNegative ? entryStyles.negative : entryStyles.positive}`}>
             {formatNumber(grandTotal, fmt)}
           </span>

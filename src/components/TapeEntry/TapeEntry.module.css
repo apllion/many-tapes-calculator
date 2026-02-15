@@ -19,12 +19,11 @@
   opacity: 1;
 }
 
-.subRow {
+.negRow {
   background: rgba(220, 50, 50, 0.06);
 }
 
-.subRow .value,
-.subRow .op {
+.negRow .value {
   color: var(--color-negative);
 }
 
