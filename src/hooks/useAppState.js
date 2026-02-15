@@ -2,20 +2,20 @@ import { useReducer, useEffect } from 'react';
 import { loadState, saveState } from '../lib/storage.js';
 import { generateId } from '../lib/ids.js';
 
-function mapAccount(state, accountId, fn) {
+function mapTape(state, tapeId, fn) {
   return {
     ...state,
-    accounts: state.accounts.map((a) =>
-      a.id === accountId ? fn(a) : a
+    tapes: state.tapes.map((a) =>
+      a.id === tapeId ? fn(a) : a
     ),
   };
 }
 
-// Actions that affect shared state (accounts, summaries, settings)
+// Actions that affect shared state (tapes, totals, settings)
 function sharedReducer(state, action) {
   switch (action.type) {
     case 'ADD_ENTRY':
-      return mapAccount(state, action.accountId, (a) => ({
+      return mapTape(state, action.tapeId, (a) => ({
         ...a,
         tape: [
           ...a.tape,
@@ -30,7 +30,7 @@ function sharedReducer(state, action) {
       }));
 
     case 'ADD_ENTRY_AND_TOTAL':
-      return mapAccount(state, action.accountId, (a) => ({
+      return mapTape(state, action.tapeId, (a) => ({
         ...a,
         tape: [
           ...a.tape,
@@ -40,7 +40,7 @@ function sharedReducer(state, action) {
       }));
 
     case 'INSERT_ENTRY':
-      return mapAccount(state, action.accountId, (a) => {
+      return mapTape(state, action.tapeId, (a) => {
         const idx = a.tape.findIndex((e) => e.id === action.afterId);
         const newEntry = {
           id: action.entryId,
@@ -54,24 +54,24 @@ function sharedReducer(state, action) {
         return { ...a, tape };
       });
 
-    case 'MOVE_ACCOUNT_LEFT': {
-      const idx = state.accounts.findIndex((a) => a.id === action.accountId);
+    case 'MOVE_TAPE_LEFT': {
+      const idx = state.tapes.findIndex((a) => a.id === action.tapeId);
       if (idx <= 0) return state;
-      const accounts = [...state.accounts];
-      [accounts[idx - 1], accounts[idx]] = [accounts[idx], accounts[idx - 1]];
-      return { ...state, accounts };
+      const tapes = [...state.tapes];
+      [tapes[idx - 1], tapes[idx]] = [tapes[idx], tapes[idx - 1]];
+      return { ...state, tapes };
     }
 
-    case 'MOVE_ACCOUNT_RIGHT': {
-      const idx = state.accounts.findIndex((a) => a.id === action.accountId);
-      if (idx < 0 || idx >= state.accounts.length - 1) return state;
-      const accounts = [...state.accounts];
-      [accounts[idx], accounts[idx + 1]] = [accounts[idx + 1], accounts[idx]];
-      return { ...state, accounts };
+    case 'MOVE_TAPE_RIGHT': {
+      const idx = state.tapes.findIndex((a) => a.id === action.tapeId);
+      if (idx < 0 || idx >= state.tapes.length - 1) return state;
+      const tapes = [...state.tapes];
+      [tapes[idx], tapes[idx + 1]] = [tapes[idx + 1], tapes[idx]];
+      return { ...state, tapes };
     }
 
     case 'UPDATE_ENTRY':
-      return mapAccount(state, action.accountId, (a) => ({
+      return mapTape(state, action.tapeId, (a) => ({
         ...a,
         tape: a.tape.map((e) =>
           e.id === action.entryId ? { ...e, ...action.updates } : e
@@ -79,7 +79,7 @@ function sharedReducer(state, action) {
       }));
 
     case 'DELETE_ENTRY':
-      return mapAccount(state, action.accountId, (a) => ({
+      return mapTape(state, action.tapeId, (a) => ({
         ...a,
         tape: a.tape.filter((e) => e.id !== action.entryId),
       }));
@@ -92,7 +92,7 @@ function sharedReducer(state, action) {
       };
       return {
         ...state,
-        accounts: state.accounts.map((a, i) => ({
+        tapes: state.tapes.map((a, i) => ({
           ...a,
           tape: [...a.tape, { ...entry, id: action.entryIds[i], timestamp: Date.now() }],
         })),
@@ -100,126 +100,126 @@ function sharedReducer(state, action) {
     }
 
     case 'CLEAR_TAPE':
-      return mapAccount(state, action.accountId, (a) => ({ ...a, tape: [] }));
+      return mapTape(state, action.tapeId, (a) => ({ ...a, tape: [] }));
 
-    case 'ADD_ACCOUNT': {
-      const name = `Account ${state.accounts.length + 1}`;
+    case 'ADD_TAPE': {
+      const name = `Tape ${state.tapes.length + 1}`;
       return {
         ...state,
-        accounts: [
-          ...state.accounts,
+        tapes: [
+          ...state.tapes,
           { id: action.id, name, tape: [], createdAt: Date.now() },
         ],
       };
     }
 
-    case 'DELETE_ACCOUNT': {
-      if (state.accounts.length <= 1) return state;
-      const remaining = state.accounts.filter((a) => a.id !== action.accountId);
+    case 'DELETE_TAPE': {
+      if (state.tapes.length <= 1) return state;
+      const remaining = state.tapes.filter((a) => a.id !== action.tapeId);
       return {
         ...state,
-        accounts: remaining,
-        summaries: (state.summaries || []).map((s) => ({
+        tapes: remaining,
+        totals: (state.totals || []).map((s) => ({
           ...s,
-          members: s.members.filter((m) => m.accountId !== action.accountId),
+          members: s.members.filter((m) => m.accountId !== action.tapeId),
         })),
       };
     }
 
-    case 'RENAME_ACCOUNT':
+    case 'RENAME_TAPE':
       return {
         ...state,
-        accounts: state.accounts.map((a) =>
-          a.id === action.accountId ? { ...a, name: action.name } : a
+        tapes: state.tapes.map((a) =>
+          a.id === action.tapeId ? { ...a, name: action.name } : a
         ),
       };
 
-    case 'SET_ACCOUNT_COLOR':
+    case 'SET_TAPE_COLOR':
       return {
         ...state,
-        accounts: state.accounts.map((a) =>
-          a.id === action.accountId ? { ...a, color: action.color } : a
+        tapes: state.tapes.map((a) =>
+          a.id === action.tapeId ? { ...a, color: action.color } : a
         ),
       };
 
     case 'SET_SETTING':
       return { ...state, settings: { ...state.settings, [action.key]: action.value } };
 
-    case 'ADD_SUMMARY': {
-      const name = action.name || `Summary ${(state.summaries || []).length + 1}`;
+    case 'ADD_TOTAL': {
+      const name = action.name || `Total ${(state.totals || []).length + 1}`;
       return {
         ...state,
-        summaries: [...(state.summaries || []), { id: action.id, name, startingValue: 0, members: [] }],
+        totals: [...(state.totals || []), { id: action.id, name, startingValue: 0, members: [] }],
       };
     }
 
-    case 'DELETE_SUMMARY': {
-      const summaries = (state.summaries || []).filter((s) => s.id !== action.summaryId);
-      return { ...state, summaries };
+    case 'DELETE_TOTAL': {
+      const totals = (state.totals || []).filter((s) => s.id !== action.totalId);
+      return { ...state, totals };
     }
 
-    case 'RENAME_SUMMARY':
+    case 'RENAME_TOTAL':
       return {
         ...state,
-        summaries: (state.summaries || []).map((s) =>
-          s.id === action.summaryId ? { ...s, name: action.name } : s
+        totals: (state.totals || []).map((s) =>
+          s.id === action.totalId ? { ...s, name: action.name } : s
         ),
       };
 
-    case 'SET_SUMMARY_STARTING_VALUE':
+    case 'SET_TOTAL_STARTING_VALUE':
       return {
         ...state,
-        summaries: (state.summaries || []).map((s) =>
-          s.id === action.summaryId ? { ...s, startingValue: action.value } : s
+        totals: (state.totals || []).map((s) =>
+          s.id === action.totalId ? { ...s, startingValue: action.value } : s
         ),
       };
 
-    case 'TOGGLE_SUMMARY_MEMBER': {
+    case 'TOGGLE_TOTAL_MEMBER': {
       return {
         ...state,
-        summaries: (state.summaries || []).map((s) => {
-          if (s.id !== action.summaryId) return s;
-          const existing = s.members.find((m) => m.accountId === action.accountId);
+        totals: (state.totals || []).map((s) => {
+          if (s.id !== action.totalId) return s;
+          const existing = s.members.find((m) => m.accountId === action.tapeId);
           if (!existing) {
-            return { ...s, members: [...s.members, { accountId: action.accountId, sign: '+' }] };
+            return { ...s, members: [...s.members, { accountId: action.tapeId, sign: '+' }] };
           }
           if (existing.sign === '+') {
-            return { ...s, members: s.members.map((m) => m.accountId === action.accountId ? { ...m, sign: '-' } : m) };
+            return { ...s, members: s.members.map((m) => m.accountId === action.tapeId ? { ...m, sign: '-' } : m) };
           }
-          return { ...s, members: s.members.filter((m) => m.accountId !== action.accountId) };
+          return { ...s, members: s.members.filter((m) => m.accountId !== action.tapeId) };
         }),
       };
     }
 
-    case 'MOVE_SUMMARY_LEFT': {
-      const summaries = [...(state.summaries || [])];
-      const idx = summaries.findIndex((s) => s.id === action.summaryId);
+    case 'MOVE_TOTAL_LEFT': {
+      const totals = [...(state.totals || [])];
+      const idx = totals.findIndex((s) => s.id === action.totalId);
       if (idx <= 0) return state;
-      [summaries[idx - 1], summaries[idx]] = [summaries[idx], summaries[idx - 1]];
-      return { ...state, summaries };
+      [totals[idx - 1], totals[idx]] = [totals[idx], totals[idx - 1]];
+      return { ...state, totals };
     }
 
-    case 'MOVE_SUMMARY_RIGHT': {
-      const summaries = [...(state.summaries || [])];
-      const idx = summaries.findIndex((s) => s.id === action.summaryId);
-      if (idx < 0 || idx >= summaries.length - 1) return state;
-      [summaries[idx], summaries[idx + 1]] = [summaries[idx + 1], summaries[idx]];
-      return { ...state, summaries };
+    case 'MOVE_TOTAL_RIGHT': {
+      const totals = [...(state.totals || [])];
+      const idx = totals.findIndex((s) => s.id === action.totalId);
+      if (idx < 0 || idx >= totals.length - 1) return state;
+      [totals[idx], totals[idx + 1]] = [totals[idx + 1], totals[idx]];
+      return { ...state, totals };
     }
 
-    case 'SET_SUMMARY_COLOR':
+    case 'SET_TOTAL_COLOR':
       return {
         ...state,
-        summaries: (state.summaries || []).map((s) =>
-          s.id === action.summaryId ? { ...s, color: action.color } : s
+        totals: (state.totals || []).map((s) =>
+          s.id === action.totalId ? { ...s, color: action.color } : s
         ),
       };
 
     case 'SYNC_STATE':
       return {
         ...state,
-        accounts: action.accounts,
-        summaries: action.summaries,
+        tapes: action.tapes,
+        totals: action.totals,
         settings: action.settings,
       };
 
@@ -231,51 +231,51 @@ function sharedReducer(state, action) {
   }
 }
 
-// Actions that affect local view state (which account/summary the user is looking at)
+// Actions that affect local view state (which tape/total the user is looking at)
 function localReducer(state, action) {
   switch (action.type) {
     case 'SET_ACTIVE':
-      return { ...state, activeAccountId: action.accountId, activeSummaryId: null };
+      return { ...state, activeTapeId: action.tapeId, activeTotalId: null };
 
-    case 'SET_ACTIVE_SUMMARY':
-      return { ...state, activeSummaryId: action.summaryId };
+    case 'SET_ACTIVE_TOTAL':
+      return { ...state, activeTotalId: action.totalId };
 
-    case 'ADD_ACCOUNT':
-      return { ...state, activeAccountId: action.id };
+    case 'ADD_TAPE':
+      return { ...state, activeTapeId: action.id };
 
-    case 'ADD_SUMMARY':
-      return { ...state, activeSummaryId: action.id };
+    case 'ADD_TOTAL':
+      return { ...state, activeTotalId: action.id };
 
-    case 'DELETE_ACCOUNT': {
-      if (state.activeAccountId === action.accountId) {
-        const remaining = state.accounts.filter((a) => a.id !== action.accountId);
-        return { ...state, activeAccountId: remaining.length > 0 ? remaining[0].id : state.activeAccountId };
+    case 'DELETE_TAPE': {
+      if (state.activeTapeId === action.tapeId) {
+        const remaining = state.tapes.filter((a) => a.id !== action.tapeId);
+        return { ...state, activeTapeId: remaining.length > 0 ? remaining[0].id : state.activeTapeId };
       }
       return state;
     }
 
-    case 'DELETE_SUMMARY':
-      if (state.activeSummaryId === action.summaryId) {
-        return { ...state, activeSummaryId: null };
+    case 'DELETE_TOTAL':
+      if (state.activeTotalId === action.totalId) {
+        return { ...state, activeTotalId: null };
       }
       return state;
 
     case 'SYNC_STATE': {
       // Fix dangling pointers after receiving remote state
-      const accountIds = new Set(state.accounts.map((a) => a.id));
-      const summaryIds = new Set((state.summaries || []).map((s) => s.id));
+      const tapeIds = new Set(state.tapes.map((a) => a.id));
+      const totalIds = new Set((state.totals || []).map((s) => s.id));
       let next = state;
-      if (!accountIds.has(next.activeAccountId)) {
-        next = { ...next, activeAccountId: state.accounts[0].id };
+      if (!tapeIds.has(next.activeTapeId)) {
+        next = { ...next, activeTapeId: state.tapes[0].id };
       }
-      if (next.activeSummaryId && !summaryIds.has(next.activeSummaryId)) {
-        next = { ...next, activeSummaryId: null };
+      if (next.activeTotalId && !totalIds.has(next.activeTotalId)) {
+        next = { ...next, activeTotalId: null };
       }
       return next;
     }
 
     case 'LOAD_STATE':
-      return state; // LOAD_STATE fully replaces via sharedReducer, including activeAccountId
+      return state; // LOAD_STATE fully replaces via sharedReducer, including activeTapeId
 
     default:
       return state;
@@ -294,17 +294,17 @@ function reducer(state, action) {
   return next;
 }
 
-// Enrich an action with accountId and pre-generated IDs before dispatch
+// Enrich an action with tapeId and pre-generated IDs before dispatch
 export function enrichAction(action, state) {
   const enriched = { ...action };
 
-  // Auto-populate accountId for actions that target the active account
-  const needsAccountId = [
+  // Auto-populate tapeId for actions that target the active tape
+  const needsTapeId = [
     'ADD_ENTRY', 'ADD_ENTRY_AND_TOTAL', 'INSERT_ENTRY',
     'UPDATE_ENTRY', 'DELETE_ENTRY', 'CLEAR_TAPE',
   ];
-  if (needsAccountId.includes(action.type) && !action.accountId) {
-    enriched.accountId = state.activeAccountId;
+  if (needsTapeId.includes(action.type) && !action.tapeId) {
+    enriched.tapeId = state.activeTapeId;
   }
 
   // Pre-generate IDs for actions that create entities
@@ -319,13 +319,13 @@ export function enrichAction(action, state) {
       break;
     case 'ADD_ENTRY_ALL':
       if (!enriched.entryIds) {
-        enriched.entryIds = state.accounts.map(() => generateId());
+        enriched.entryIds = state.tapes.map(() => generateId());
       }
       break;
-    case 'ADD_ACCOUNT':
+    case 'ADD_TAPE':
       if (!enriched.id) enriched.id = generateId();
       break;
-    case 'ADD_SUMMARY':
+    case 'ADD_TOTAL':
       if (!enriched.id) enriched.id = generateId();
       break;
   }
@@ -336,7 +336,7 @@ export function enrichAction(action, state) {
 export function useAppState() {
   const [state, rawDispatch] = useReducer(reducer, null, loadState);
 
-  // Enriching dispatch: auto-populates accountId and pre-generates IDs
+  // Enriching dispatch: auto-populates tapeId and pre-generates IDs
   function dispatch(action) {
     rawDispatch(enrichAction(action, state));
   }
@@ -345,13 +345,13 @@ export function useAppState() {
     saveState(state);
   }, [state]);
 
-  const activeAccount = state.accounts.find(
-    (a) => a.id === state.activeAccountId
+  const activeTape = state.tapes.find(
+    (a) => a.id === state.activeTapeId
   );
 
-  const activeSummary = state.activeSummaryId
-    ? (state.summaries || []).find((s) => s.id === state.activeSummaryId) || null
+  const activeTotal = state.activeTotalId
+    ? (state.totals || []).find((s) => s.id === state.activeTotalId) || null
     : null;
 
-  return { state, dispatch, rawDispatch, activeAccount, activeSummary };
+  return { state, dispatch, rawDispatch, activeTape, activeTotal };
 }

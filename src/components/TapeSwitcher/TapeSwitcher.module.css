@@ -48,7 +48,7 @@
   opacity: 1;
 }
 
-.summaryTab {
+.totalTab {
   font-weight: 700;
   font-size: 1rem;
 }
@@ -66,4 +66,25 @@
 
 .addBtn:hover {
   color: var(--color-accent);
+}
+
+@media (orientation: landscape) {
+  .container {
+    overflow-x: visible;
+    overflow-y: auto;
+    padding: var(--space-sm);
+    grid-row: 1 / -1;
+    width: 140px;
+  }
+
+  .tabs {
+    flex-direction: column;
+  }
+
+  .tab {
+    padding: var(--space-sm);
+    font-size: 0.95rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }

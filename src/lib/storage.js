@@ -1,22 +1,42 @@
 import * as v from 'valibot';
-import { AppStateSchema } from '../schemas/account.js';
+import { AppStateSchema } from '../schemas/tape.js';
 import { generateId } from './ids.js';
 
 const STORAGE_KEY = 'many-tapes-calculator';
 
 function createDefaultState() {
-  const accountId = generateId();
+  const tapeId = generateId();
   return {
-    accounts: [
+    tapes: [
       {
-        id: accountId,
-        name: 'Account 1',
+        id: tapeId,
+        name: 'Tape 1',
         tape: [],
         createdAt: Date.now(),
       },
     ],
-    activeAccountId: accountId,
+    activeTapeId: tapeId,
   };
+}
+
+function migrateKeys(obj) {
+  if (obj.accounts && !obj.tapes) {
+    obj.tapes = obj.accounts;
+    delete obj.accounts;
+  }
+  if ('activeAccountId' in obj && !('activeTapeId' in obj)) {
+    obj.activeTapeId = obj.activeAccountId;
+    delete obj.activeAccountId;
+  }
+  if (obj.summaries && !obj.totals) {
+    obj.totals = obj.summaries;
+    delete obj.summaries;
+  }
+  if ('activeSummaryId' in obj && !('activeTotalId' in obj)) {
+    obj.activeTotalId = obj.activeSummaryId;
+    delete obj.activeSummaryId;
+  }
+  return obj;
 }
 
 export function loadState() {
@@ -24,7 +44,8 @@ export function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return createDefaultState();
     const parsed = JSON.parse(raw);
-    return v.parse(AppStateSchema, parsed);
+    const migrated = migrateKeys(parsed);
+    return v.parse(AppStateSchema, migrated);
   } catch {
     return createDefaultState();
   }

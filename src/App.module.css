@@ -6,3 +6,11 @@
   margin: 0 auto;
   background: var(--color-bg);
 }
+
+@media (orientation: landscape) {
+  .app {
+    display: grid;
+    grid-template-columns: min-content 1fr;
+    grid-template-rows: 1fr auto;
+  }
+}

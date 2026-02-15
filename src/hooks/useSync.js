@@ -14,12 +14,12 @@ function generateRoomCode() {
 }
 
 // Actions that are purely local and should not be broadcast
-const LOCAL_ONLY_ACTIONS = new Set(['SET_ACTIVE', 'SET_ACTIVE_SUMMARY']);
+const LOCAL_ONLY_ACTIONS = new Set(['SET_ACTIVE', 'SET_ACTIVE_TOTAL']);
 
 function getSharedState(state) {
   return {
-    accounts: state.accounts,
-    summaries: state.summaries || [],
+    tapes: state.tapes,
+    totals: state.totals || [],
     settings: state.settings || {},
   };
 }
@@ -100,8 +100,8 @@ export function useSync(state, rawDispatch) {
       established = true;
       rawDispatch({
         type: 'SYNC_STATE',
-        accounts: sharedState.accounts,
-        summaries: sharedState.summaries,
+        tapes: sharedState.tapes,
+        totals: sharedState.totals,
         settings: sharedState.settings,
         _remote: true,
       });

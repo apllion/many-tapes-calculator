@@ -1,37 +1,38 @@
 import { useState } from 'react';
 import { useAppState } from './hooks/useAppState.js';
 import { useSync } from './hooks/useSync.js';
-import AccountSwitcher from './components/AccountSwitcher/AccountSwitcher.jsx';
+import TapeSwitcher from './components/TapeSwitcher/TapeSwitcher.jsx';
 import Tape, { computeRunningTotals } from './components/Tape/Tape.jsx';
-import SummaryTape from './components/SummaryTape/SummaryTape.jsx';
+import TotalTape from './components/TotalTape/TotalTape.jsx';
 import NumberInput from './components/NumberInput/NumberInput.jsx';
 import styles from './App.module.css';
 
 export default function App() {
-  const { state, dispatch, rawDispatch, activeAccount, activeSummary } = useAppState();
+  const { state, dispatch, rawDispatch, activeTape, activeTotal } = useAppState();
   const sync = useSync(state, rawDispatch);
   const d = sync.syncDispatch;
   const [editingId, setEditingId] = useState(null);
+  const [totalConfigOpen, setTotalConfigOpen] = useState(false);
 
-  const viewingSummary = activeSummary !== null;
+  const viewingTotal = activeTotal !== null;
 
-  // Clear editing when switching to summary view
-  if (viewingSummary && editingId) {
+  // Clear editing when switching to total view
+  if (viewingTotal && editingId) {
     setEditingId(null);
   }
 
   const editingEntry = editingId
-    ? activeAccount.tape.find((e) => e.id === editingId) ?? null
+    ? activeTape.tape.find((e) => e.id === editingId) ?? null
     : null;
 
-  const { totals, subProducts } = computeRunningTotals(activeAccount.tape);
+  const { totals, subProducts } = computeRunningTotals(activeTape.tape);
   const lastIndex = totals.length - 1;
   const subtotal = lastIndex >= 0 ? totals[lastIndex] : 0;
   const currentSubProduct = lastIndex >= 0 ? subProducts[lastIndex] : null;
 
   // When editing a line, memory store operates from that line's position
   const editingIndex = editingId
-    ? activeAccount.tape.findIndex((e) => e.id === editingId)
+    ? activeTape.tape.findIndex((e) => e.id === editingId)
     : -1;
   const storeSubtotal = editingIndex >= 0 ? totals[editingIndex] : subtotal;
 
@@ -49,18 +50,18 @@ export default function App() {
 
   return (
     <div className={styles.app}>
-      <AccountSwitcher
-        accounts={state.accounts}
-        activeAccountId={state.activeAccountId}
-        summaries={state.summaries || []}
-        activeSummaryId={state.activeSummaryId}
+      <TapeSwitcher
+        tapes={state.tapes}
+        activeTapeId={state.activeTapeId}
+        totals={state.totals || []}
+        activeTotalId={state.activeTotalId}
         dispatch={d}
       />
-      {viewingSummary ? (
-        <SummaryTape summary={activeSummary} accounts={state.accounts} settings={settings} dispatch={d} />
+      {viewingTotal ? (
+        <TotalTape total={activeTotal} tapes={state.tapes} settings={settings} dispatch={d} showDeselected={totalConfigOpen} />
       ) : (
         <Tape
-          tape={activeAccount.tape}
+          tape={activeTape.tape}
           dispatch={d}
           editingId={editingId}
           onSelect={setEditingId}
@@ -75,13 +76,14 @@ export default function App() {
         currentSubProduct={currentSubProduct}
         storeSubtotal={storeSubtotal}
         storeSubProduct={storeSubProduct}
-        activeAccountId={state.activeAccountId}
-        activeAccountName={activeAccount.name}
-        activeAccountColor={activeAccount.color || null}
+        activeTapeId={state.activeTapeId}
+        activeTapeName={activeTape.name}
+        activeTapeColor={activeTape.color || null}
         appState={state}
-        activeSummary={activeSummary}
-        viewingSummary={viewingSummary}
+        activeTotal={activeTotal}
+        viewingTotal={viewingTotal}
         sync={sync}
+        onTotalConfigChange={setTotalConfigOpen}
       />
     </div>
   );

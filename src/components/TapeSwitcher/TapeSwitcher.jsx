@@ -1,0 +1,57 @@
+import styles from './TapeSwitcher.module.css';
+
+export default function TapeSwitcher({ tapes, activeTapeId, totals, activeTotalId, dispatch }) {
+  return (
+    <div className={styles.container}>
+      <div className={styles.tabs}>
+        {tapes.map((tape) => (
+          <button
+            key={tape.id}
+            className={`${styles.tab} ${!activeTotalId && tape.id === activeTapeId ? styles.active : ''}`}
+            style={tape.color ? ((!activeTotalId && tape.id === activeTapeId) ? { background: tape.color } : { background: tape.color + '30', color: tape.color, borderBottom: `3px solid ${tape.color}` }) : undefined}
+            onClick={() => dispatch({ type: 'SET_ACTIVE', tapeId: tape.id })}
+          >
+            {tape.name}
+            {tapes.length > 1 && (
+              <span
+                className={styles.close}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  dispatch({ type: 'DELETE_TAPE', tapeId: tape.id });
+                }}
+              >
+                &times;
+              </span>
+            )}
+          </button>
+        ))}
+        <button
+          className={styles.addBtn}
+          onClick={() => dispatch({ type: 'ADD_TAPE' })}
+          aria-label="Add tape"
+        >
+          +
+        </button>
+        {totals.map((total) => (
+          <button
+            key={total.id}
+            className={`${styles.tab} ${styles.totalTab} ${activeTotalId === total.id ? styles.active : ''}`}
+            style={total.color ? ((activeTotalId === total.id) ? { background: total.color } : { background: total.color + '30', color: total.color, borderBottom: `3px solid ${total.color}` }) : undefined}
+            onClick={() => dispatch({ type: 'SET_ACTIVE_TOTAL', totalId: total.id })}
+          >
+            &Sigma; {total.name}
+            <span
+              className={styles.close}
+              onClick={(e) => {
+                e.stopPropagation();
+                dispatch({ type: 'DELETE_TOTAL', totalId: total.id });
+              }}
+            >
+              &times;
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}

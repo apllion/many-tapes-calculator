@@ -19,4 +19,23 @@
 
   --font-mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
   --max-width: 480px;
+  --btn-height: clamp(42px, 8.5dvh, 60px);
+}
+
+@media (min-width: 768px) {
+  :root {
+    --max-width: 600px;
+  }
+}
+
+@media (orientation: landscape) {
+  :root {
+    --btn-height: clamp(46px, 10dvh, 64px);
+  }
+}
+
+@media (max-height: 500px) {
+  :root {
+    --btn-height: 38px;
+  }
 }

@@ -8,7 +8,7 @@ export const TapeEntrySchema = v.object({
   timestamp: v.number(),
 });
 
-export const AccountSchema = v.object({
+export const TapeSchema = v.object({
   id: v.string(),
   name: v.string(),
   tape: v.array(TapeEntrySchema),
@@ -16,16 +16,16 @@ export const AccountSchema = v.object({
   color: v.optional(v.nullable(v.string())),
 });
 
-export const SummaryMemberSchema = v.object({
+export const TotalMemberSchema = v.object({
   accountId: v.string(),
   sign: v.picklist(['+', '-']),
 });
 
-export const SummarySchema = v.object({
+export const TotalSchema = v.object({
   id: v.string(),
   name: v.string(),
   startingValue: v.optional(v.number(), 0),
-  members: v.optional(v.array(SummaryMemberSchema), []),
+  members: v.optional(v.array(TotalMemberSchema), []),
   color: v.optional(v.nullable(v.string())),
 });
 
@@ -36,9 +36,9 @@ export const SettingsSchema = v.object({
 });
 
 export const AppStateSchema = v.object({
-  accounts: v.pipe(v.array(AccountSchema), v.minLength(1)),
-  activeAccountId: v.string(),
+  tapes: v.pipe(v.array(TapeSchema), v.minLength(1)),
+  activeTapeId: v.string(),
   settings: v.optional(SettingsSchema),
-  summaries: v.optional(v.array(SummarySchema), []),
-  activeSummaryId: v.optional(v.nullable(v.string()), null),
+  totals: v.optional(v.array(TotalSchema), []),
+  activeTotalId: v.optional(v.nullable(v.string()), null),
 });
