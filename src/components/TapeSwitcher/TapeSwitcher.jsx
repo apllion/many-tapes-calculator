@@ -7,24 +7,39 @@ export default function TapeSwitcher({ tapes, activeTapeId, totals, activeTotalI
   const fmt = settings?.numberFormat;
   const calcMode = settings?.calculationMode;
   const longRef = useRef(null);
+  const startPos = useRef(null);
 
-  function onCloseDown(action) {
+  function onCloseDown(e, action) {
+    startPos.current = { x: e.clientX, y: e.clientY };
     longRef.current = setTimeout(() => {
       longRef.current = 'fired';
       dispatch(action);
     }, 600);
   }
+  function onCloseMove(e) {
+    if (!startPos.current || !longRef.current || longRef.current === 'fired') return;
+    const dx = e.clientX - startPos.current.x;
+    const dy = e.clientY - startPos.current.y;
+    if (dx * dx + dy * dy > 100) {
+      clearTimeout(longRef.current);
+      longRef.current = null;
+      startPos.current = null;
+    }
+  }
   function onCloseUp() {
     if (longRef.current === 'fired') {
       longRef.current = null;
+      startPos.current = null;
       return;
     }
     clearTimeout(longRef.current);
     longRef.current = null;
+    startPos.current = null;
   }
   function onCloseCancel() {
     clearTimeout(longRef.current);
     longRef.current = null;
+    startPos.current = null;
   }
 
   return (
@@ -47,8 +62,9 @@ export default function TapeSwitcher({ tapes, activeTapeId, totals, activeTotalI
                 className={styles.close}
                 onPointerDown={(e) => {
                   e.stopPropagation();
-                  onCloseDown({ type: 'DELETE_TAPE', tapeId: tape.id });
+                  onCloseDown(e, { type: 'DELETE_TAPE', tapeId: tape.id });
                 }}
+                onPointerMove={onCloseMove}
                 onPointerUp={(e) => {
                   e.stopPropagation();
                   onCloseUp();
@@ -105,8 +121,9 @@ export default function TapeSwitcher({ tapes, activeTapeId, totals, activeTotalI
               className={styles.close}
               onPointerDown={(e) => {
                 e.stopPropagation();
-                onCloseDown({ type: 'DELETE_TOTAL', totalId: total.id });
+                onCloseDown(e, { type: 'DELETE_TOTAL', totalId: total.id });
               }}
+              onPointerMove={onCloseMove}
               onPointerUp={(e) => {
                 e.stopPropagation();
                 onCloseUp();

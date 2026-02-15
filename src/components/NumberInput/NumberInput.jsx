@@ -725,7 +725,8 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
     }
 
     if (keypadMode === 'saves') {
-      function onSaveItemDown(id, isAutosave) {
+      function onSaveItemDown(e, id, isAutosave) {
+        e.preventDefault();
         saveLongRef.current = setTimeout(() => {
           saveLongRef.current = 'fired';
           const save = isAutosave ? getAutosave(id) : getSave(id);
@@ -765,7 +766,7 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
               <div
                 key={s.id}
                 className={`${styles.saveItem} ${styles.longPress}`}
-                onPointerDown={() => onSaveItemDown(s.id, false)}
+                onPointerDown={(e) => onSaveItemDown(e, s.id, false)}
                 onPointerUp={onSaveItemUp}
                 onPointerCancel={onSaveItemCancel}
                 onContextMenu={(e) => e.preventDefault()}
@@ -792,7 +793,7 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
                   <div
                     key={s.id}
                     className={`${styles.saveItem} ${styles.longPress}`}
-                    onPointerDown={() => onSaveItemDown(s.id, true)}
+                    onPointerDown={(e) => onSaveItemDown(e, s.id, true)}
                     onPointerUp={onSaveItemUp}
                     onPointerCancel={onSaveItemCancel}
                     onContextMenu={(e) => e.preventDefault()}

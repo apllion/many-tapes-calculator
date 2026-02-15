@@ -17,17 +17,19 @@ export default function App() {
   const [configRequest, setConfigRequest] = useState(null);
   const [previewEntry, setPreviewEntry] = useState(null);
   // Autosave every 5 minutes, skip if nothing changed
+  const stateRef = useRef(state);
+  stateRef.current = state;
   const lastAutosaveJson = useRef(null);
   useEffect(() => {
     const interval = setInterval(() => {
-      const json = JSON.stringify(state);
+      const json = JSON.stringify(stateRef.current);
       if (json !== lastAutosaveJson.current) {
         lastAutosaveJson.current = json;
-        addAutosave(state);
+        addAutosave(stateRef.current);
       }
     }, 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [state]);
+  }, []);
 
   const viewingTotal = activeTotal !== null;
 
