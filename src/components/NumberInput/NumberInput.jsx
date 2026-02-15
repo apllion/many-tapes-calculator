@@ -737,13 +737,14 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
           }
         }, 600);
       }
-      function onSaveItemUp() {
+      function onSaveItemUp(name) {
         if (saveLongRef.current === 'fired') {
           saveLongRef.current = null;
           return;
         }
         clearTimeout(saveLongRef.current);
         saveLongRef.current = null;
+        setInput(name);
       }
       function onSaveItemCancel() {
         clearTimeout(saveLongRef.current);
@@ -767,7 +768,7 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
                 key={s.id}
                 className={`${styles.saveItem} ${styles.longPress}`}
                 onPointerDown={(e) => onSaveItemDown(e, s.id, false)}
-                onPointerUp={onSaveItemUp}
+                onPointerUp={() => onSaveItemUp(s.name)}
                 onPointerCancel={onSaveItemCancel}
                 onContextMenu={(e) => e.preventDefault()}
               >
@@ -794,7 +795,7 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
                     key={s.id}
                     className={`${styles.saveItem} ${styles.longPress}`}
                     onPointerDown={(e) => onSaveItemDown(e, s.id, true)}
-                    onPointerUp={onSaveItemUp}
+                    onPointerUp={() => onSaveItemUp(s.name)}
                     onPointerCancel={onSaveItemCancel}
                     onContextMenu={(e) => e.preventDefault()}
                   >
