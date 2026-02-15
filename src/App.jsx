@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAppState } from './hooks/useAppState.js';
 import { useSync } from './hooks/useSync.js';
+import { addAutosave } from './lib/saves.js';
 import TapeSwitcher from './components/TapeSwitcher/TapeSwitcher.jsx';
 import Tape, { computeRunningTotals } from './components/Tape/Tape.jsx';
 import TotalTape from './components/TotalTape/TotalTape.jsx';
@@ -14,6 +15,19 @@ export default function App() {
   const [editingId, setEditingId] = useState(null);
   const [totalConfigOpen, setTotalConfigOpen] = useState(false);
 
+  // Autosave every 5 minutes, skip if nothing changed
+  const lastAutosaveJson = useRef(null);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const json = JSON.stringify(state);
+      if (json !== lastAutosaveJson.current) {
+        lastAutosaveJson.current = json;
+        addAutosave(state);
+      }
+    }, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [state]);
+
   const viewingTotal = activeTotal !== null;
 
   // Clear editing when switching to total view
@@ -21,11 +35,13 @@ export default function App() {
     setEditingId(null);
   }
 
+  const settings = state.settings || {};
+
   const editingEntry = editingId
     ? activeTape.tape.find((e) => e.id === editingId) ?? null
     : null;
 
-  const { totals, subProducts } = computeRunningTotals(activeTape.tape);
+  const { totals, subProducts } = computeRunningTotals(activeTape.tape, settings.calculationMode);
   const lastIndex = totals.length - 1;
   const subtotal = lastIndex >= 0 ? totals[lastIndex] : 0;
   const currentSubProduct = lastIndex >= 0 ? subProducts[lastIndex] : null;
@@ -45,8 +61,6 @@ export default function App() {
       break;
     }
   }
-
-  const settings = state.settings || {};
 
   return (
     <div className={styles.app}>

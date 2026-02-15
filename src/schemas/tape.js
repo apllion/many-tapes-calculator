@@ -33,6 +33,7 @@ export const SettingsSchema = v.object({
   numberFormat: v.optional(v.picklist(['2dec', '0dec', 'eu2dec', 'eu0dec']), '2dec'),
   colorSubtractions: v.optional(v.boolean(), false),
   palette: v.optional(v.array(v.string())),
+  calculationMode: v.optional(v.picklist(['arithmetic', 'adding']), 'arithmetic'),
 });
 
 export const AppStateSchema = v.object({

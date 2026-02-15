@@ -1,6 +1,28 @@
+import { useRef } from 'react';
 import styles from './TapeSwitcher.module.css';
 
 export default function TapeSwitcher({ tapes, activeTapeId, totals, activeTotalId, dispatch }) {
+  const longRef = useRef(null);
+
+  function onCloseDown(action) {
+    longRef.current = setTimeout(() => {
+      longRef.current = 'fired';
+      dispatch(action);
+    }, 600);
+  }
+  function onCloseUp() {
+    if (longRef.current === 'fired') {
+      longRef.current = null;
+      return;
+    }
+    clearTimeout(longRef.current);
+    longRef.current = null;
+  }
+  function onCloseCancel() {
+    clearTimeout(longRef.current);
+    longRef.current = null;
+  }
+
   return (
     <div className={styles.container}>
       <div className={styles.tabs}>
@@ -15,10 +37,20 @@ export default function TapeSwitcher({ tapes, activeTapeId, totals, activeTotalI
             {tapes.length > 1 && (
               <span
                 className={styles.close}
-                onClick={(e) => {
+                onPointerDown={(e) => {
                   e.stopPropagation();
-                  dispatch({ type: 'DELETE_TAPE', tapeId: tape.id });
+                  onCloseDown({ type: 'DELETE_TAPE', tapeId: tape.id });
                 }}
+                onPointerUp={(e) => {
+                  e.stopPropagation();
+                  onCloseUp();
+                }}
+                onPointerCancel={(e) => {
+                  e.stopPropagation();
+                  onCloseCancel();
+                }}
+                onClick={(e) => e.stopPropagation()}
+                onContextMenu={(e) => e.preventDefault()}
               >
                 &times;
               </span>
@@ -42,10 +74,20 @@ export default function TapeSwitcher({ tapes, activeTapeId, totals, activeTotalI
             &Sigma; {total.name}
             <span
               className={styles.close}
-              onClick={(e) => {
+              onPointerDown={(e) => {
                 e.stopPropagation();
-                dispatch({ type: 'DELETE_TOTAL', totalId: total.id });
+                onCloseDown({ type: 'DELETE_TOTAL', totalId: total.id });
               }}
+              onPointerUp={(e) => {
+                e.stopPropagation();
+                onCloseUp();
+              }}
+              onPointerCancel={(e) => {
+                e.stopPropagation();
+                onCloseCancel();
+              }}
+              onClick={(e) => e.stopPropagation()}
+              onContextMenu={(e) => e.preventDefault()}
             >
               &times;
             </span>

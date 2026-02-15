@@ -1,6 +1,8 @@
 import { generateId } from './ids.js';
 
 const SAVES_KEY = 'many-tapes-calculator-saves';
+const AUTOSAVES_KEY = 'many-tapes-calculator-autosaves';
+const MAX_AUTOSAVES = 3;
 
 function readAll() {
   try {
@@ -43,4 +45,32 @@ export function renameSave(id, name) {
     save.name = name;
     writeAll(saves);
   }
+}
+
+function readAllAutosaves() {
+  try {
+    const raw = localStorage.getItem(AUTOSAVES_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeAllAutosaves(autosaves) {
+  localStorage.setItem(AUTOSAVES_KEY, JSON.stringify(autosaves));
+}
+
+export function addAutosave(state) {
+  const autosaves = readAllAutosaves();
+  const entry = { id: generateId(), name: 'Auto', timestamp: Date.now(), state };
+  autosaves.unshift(entry);
+  writeAllAutosaves(autosaves.slice(0, MAX_AUTOSAVES));
+}
+
+export function loadAutosaves() {
+  return readAllAutosaves().map(({ id, name, timestamp }) => ({ id, name, timestamp }));
+}
+
+export function getAutosave(id) {
+  return readAllAutosaves().find((s) => s.id === id) || null;
 }

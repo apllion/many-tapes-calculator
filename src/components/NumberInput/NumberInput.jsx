@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import * as v from 'valibot';
 import { AppStateSchema } from '../../schemas/tape.js';
 import { formatNumber, FORMAT_LABELS, FORMAT_ORDER } from '../../lib/format.js';
-import { loadSaves, getSave, addSave, deleteSave } from '../../lib/saves.js';
+import { loadSaves, getSave, addSave, deleteSave, loadAutosaves, getAutosave } from '../../lib/saves.js';
 import styles from './NumberInput.module.css';
 
 const TEXT_STORE_COUNT = 18;
@@ -40,6 +40,7 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
   const [memoryValue, setMemoryValue] = useState(null);
   const [textStores, setTextStores] = useState(Array(TEXT_STORE_COUNT).fill(null));
   const [saves, setSaves] = useState([]);
+  const [autosaves, setAutosaves] = useState([]);
   const textRef = useRef(null);
   const fileRef = useRef(null);
   const colorRef = useRef(null);
@@ -744,10 +745,33 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
                 <span className={styles.saveDate}>{relativeTime(s.timestamp)}</span>
               </div>
             ))}
-            {saves.length === 0 && (
+            {saves.length === 0 && autosaves.length === 0 && (
               <div className={styles.saveItem} style={{ justifyContent: 'center', color: 'var(--color-text-muted)' }}>
                 No saves yet
               </div>
+            )}
+            {autosaves.length > 0 && (
+              <>
+                <div className={styles.saveItem} style={{ justifyContent: 'center', color: 'var(--color-text-muted)', fontSize: '0.7rem', minHeight: 0, padding: '4px 0 0' }}>
+                  Autosaves
+                </div>
+                {autosaves.map((s) => (
+                  <div
+                    key={s.id}
+                    className={styles.saveItem}
+                    onClick={() => {
+                      const save = getAutosave(s.id);
+                      if (save) {
+                        dispatch({ type: 'LOAD_STATE', state: save.state });
+                        setKeypadMode('normal');
+                      }
+                    }}
+                  >
+                    <span className={styles.saveName}>{s.name}</span>
+                    <span className={styles.saveDate}>{relativeTime(s.timestamp)}</span>
+                  </div>
+                ))}
+              </>
             )}
           </div>
         </div>
@@ -757,6 +781,7 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
     if (keypadMode === 'setup') {
       const currentFmt = appState.settings?.numberFormat || '2dec';
       const colorSub = appState.settings?.colorSubtractions || false;
+      const calcMode = appState.settings?.calculationMode || 'arithmetic';
       return (
         <div className={styles.grid}>
           <button className={`${styles.navBtn} ${styles.longPress}`} onPointerDown={navDown} onPointerUp={() => navUp(() => setKeypadMode('normal'))} onPointerCancel={navCancel} onContextMenu={(e) => e.preventDefault()}>setup</button>
@@ -780,6 +805,13 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
             {colorSub ? 'Color \u2212: ON' : 'Color \u2212: OFF'}
           </button>
           <button
+            className={`${styles.wideBtn} ${calcMode === 'adding' ? styles.toggleOn : ''}`}
+            style={{ gridColumn: 'span 2' }}
+            onClick={() => dispatch({ type: 'SET_SETTING', key: 'calculationMode', value: calcMode === 'adding' ? 'arithmetic' : 'adding' })}
+          >
+            {calcMode === 'adding' ? 'Adding Machine' : 'Arithmetic'}
+          </button>
+          <button
             className={styles.wideBtn}
             style={{ gridColumn: 'span 2' }}
             onClick={() => {
@@ -793,7 +825,7 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
 
           <button className={styles.wideBtn} style={{ gridColumn: 'span 2' }} onClick={act(exportAll)}>Export</button>
           <button className={styles.wideBtn} style={{ gridColumn: 'span 2' }} onClick={act(importData)}>Import</button>
-          <button className={styles.wideBtn} style={{ gridColumn: 'span 2' }} onClick={() => { setSaves(loadSaves()); setKeypadMode('saves'); }}>Saves</button>
+          <button className={styles.wideBtn} style={{ gridColumn: 'span 2' }} onClick={() => { setSaves(loadSaves()); setAutosaves(loadAutosaves()); setKeypadMode('saves'); }}>Saves</button>
           <button
             className={`${styles.wideBtn} ${sync.roomId ? styles.toggleOn : ''}`}
             style={{ gridColumn: 'span 2' }}

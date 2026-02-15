@@ -13,7 +13,10 @@ import styles from './Tape.module.css';
  *
  * Each entry's running total = "total if the tape ended here."
  */
-export function computeRunningTotals(tape) {
+export function computeRunningTotals(tape, mode = 'arithmetic') {
+  if (mode === 'adding') {
+    return computeRunningTotalsAdding(tape);
+  }
   const totals = [];
   const subProducts = [];
   let total = 0;
@@ -84,13 +87,57 @@ export function computeRunningTotals(tape) {
   return { totals, subProducts };
 }
 
+function computeRunningTotalsAdding(tape) {
+  const totals = [];
+  const subProducts = [];
+  let total = 0;
+  let pendingOp = '+';
+
+  for (let i = 0; i < tape.length; i++) {
+    const entry = tape[i];
+
+    if (entry.op === 'text') {
+      totals.push(totals.length > 0 ? totals[totals.length - 1] : 0);
+      subProducts.push(null);
+      continue;
+    }
+
+    if (entry.op === '=' || entry.op === 'T') {
+      totals.push(total);
+      subProducts.push(null);
+      if (entry.op === 'T') {
+        total = 0;
+      }
+      pendingOp = '+';
+      continue;
+    }
+
+    total = applyOp(pendingOp, total, entry.value);
+    totals.push(total);
+    subProducts.push(null);
+    pendingOp = entry.op;
+  }
+
+  return { totals, subProducts };
+}
+
+function applyOp(op, a, b) {
+  switch (op) {
+    case '+': return a + b;
+    case '-': return a - b;
+    case '*': return a * b;
+    case '/': return b !== 0 ? a / b : a;
+    default: return a + b;
+  }
+}
+
 function applyAdd(op, total, value) {
   return op === '+' ? total + value : total - value;
 }
 
 export default function Tape({ tape, dispatch, editingId, onSelect, settings }) {
   const bottomRef = useRef(null);
-  const { totals, subProducts } = computeRunningTotals(tape);
+  const { totals, subProducts } = computeRunningTotals(tape, settings?.calculationMode);
 
   // Compute # numbering for text entries
   const textCounts = {};

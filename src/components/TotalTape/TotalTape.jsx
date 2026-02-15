@@ -1,9 +1,16 @@
+import { useEffect, useRef } from 'react';
 import { computeRunningTotals } from '../Tape/Tape.jsx';
 import { formatNumber } from '../../lib/format.js';
 import tapeStyles from '../Tape/Tape.module.css';
 import entryStyles from '../TapeEntry/TapeEntry.module.css';
 
 export default function TotalTape({ total, tapes, settings, dispatch, showDeselected }) {
+  const containerRef = useRef(null);
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+    }
+  }, [total.id]);
   const fmt = settings?.numberFormat;
   const memberMap = {};
   (total.members || []).forEach((m) => { memberMap[m.accountId] = m.sign; });
@@ -14,7 +21,7 @@ export default function TotalTape({ total, tapes, settings, dispatch, showDesele
     const sign = memberMap[tape.id] || null;
     const isMember = sign !== null;
     if (!isMember && !showDeselected) return null;
-    const { totals } = computeRunningTotals(tape.tape);
+    const { totals } = computeRunningTotals(tape.tape, settings?.calculationMode);
     const subtotal = totals.length > 0 ? totals[totals.length - 1] : 0;
     const signedValue = sign === '-' ? -subtotal : subtotal;
     if (isMember) grandTotal += signedValue;
@@ -52,7 +59,7 @@ export default function TotalTape({ total, tapes, settings, dispatch, showDesele
   const totalNegative = grandTotal < 0;
 
   return (
-    <div className={tapeStyles.container}>
+    <div className={tapeStyles.container} ref={containerRef}>
       <div className={tapeStyles.entries}>
         {startingValue !== 0 && (
           <div
