@@ -34,6 +34,7 @@ export const SettingsSchema = v.object({
   colorNegatives: v.optional(v.boolean(), false),
   palette: v.optional(v.array(v.string())),
   calculationMode: v.optional(v.picklist(['arithmetic', 'adding']), 'arithmetic'),
+  textStores: v.optional(v.array(v.nullable(v.string())), []),
 });
 
 export const AppStateSchema = v.object({

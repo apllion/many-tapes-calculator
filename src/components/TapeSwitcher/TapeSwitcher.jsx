@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useEffect } from 'react';
 import { computeRunningTotals } from '../Tape/Tape.jsx';
 import { formatNumber } from '../../lib/format.js';
 import styles from './TapeSwitcher.module.css';
@@ -41,6 +41,21 @@ export default function TapeSwitcher({ tapes, activeTapeId, totals, activeTotalI
     longRef.current = null;
     startPos.current = null;
   }
+
+  // Reset long-press ref when page resumes from suspension
+  useEffect(() => {
+    function onVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        if (longRef.current !== null) {
+          if (longRef.current !== 'fired') clearTimeout(longRef.current);
+          longRef.current = null;
+        }
+        startPos.current = null;
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, []);
 
   return (
     <div className={styles.container}>

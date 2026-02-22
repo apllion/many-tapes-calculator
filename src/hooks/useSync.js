@@ -33,13 +33,18 @@ export function useSync(state, rawDispatch) {
   const sendActionRef = useRef(null);
   const sendStateRef = useRef(null);
   const stateRef = useRef(state);
+  stateRef.current = state;
+  const reconnectRef = useRef(null); // { code, isCreator, timer, delay }
 
-  // Keep stateRef current so peer-join handler can access latest state
-  useEffect(() => {
-    stateRef.current = state;
-  }, [state]);
+  const clearReconnect = useCallback(() => {
+    if (reconnectRef.current?.timer) {
+      clearTimeout(reconnectRef.current.timer);
+    }
+    reconnectRef.current = null;
+  }, []);
 
   const cleanup = useCallback(() => {
+    clearReconnect();
     if (roomRef.current) {
       roomRef.current.leave();
       roomRef.current = null;
@@ -49,18 +54,33 @@ export function useSync(state, rawDispatch) {
     setPeerCount(0);
     setStatus('disconnected');
     setRoomId(null);
-  }, []);
+  }, [clearReconnect]);
 
   const connect = useCallback((code, isCreator) => {
-    // Clean up any existing room
+    // Clean up any existing room (but keep reconnect info)
     if (roomRef.current) {
       roomRef.current.leave();
+      roomRef.current = null;
     }
+    sendActionRef.current = null;
+    sendStateRef.current = null;
 
     setStatus('connecting');
     setRoomId(code);
 
-    const room = joinRoom({ appId: APP_ID }, code);
+    // Store reconnect info
+    if (!reconnectRef.current || reconnectRef.current.code !== code) {
+      clearReconnect();
+      reconnectRef.current = { code, isCreator, timer: null, delay: 2000 };
+    }
+
+    let room;
+    try {
+      room = joinRoom({ appId: APP_ID }, code);
+    } catch {
+      scheduleReconnect();
+      return;
+    }
     roomRef.current = room;
 
     // Creators are established from the start (they own the state).
@@ -76,6 +96,8 @@ export function useSync(state, rawDispatch) {
     room.onPeerJoin((peerId) => {
       setPeerCount(Object.keys(room.getPeers()).length);
       setStatus('connected');
+      // Reset reconnect delay on successful connection
+      if (reconnectRef.current) reconnectRef.current.delay = 2000;
       // Only send state if we're established (creator or already synced)
       if (established) {
         sendState(getSharedState(stateRef.current), peerId);
@@ -87,6 +109,7 @@ export function useSync(state, rawDispatch) {
       setPeerCount(count);
       if (count === 0) {
         setStatus('connecting');
+        scheduleReconnect();
       }
     });
 
@@ -106,7 +129,17 @@ export function useSync(state, rawDispatch) {
         _remote: true,
       });
     });
-  }, [rawDispatch]);
+  }, [rawDispatch, clearReconnect]);
+
+  function scheduleReconnect() {
+    const info = reconnectRef.current;
+    if (!info || info.timer) return;
+    info.timer = setTimeout(() => {
+      info.timer = null;
+      info.delay = Math.min(info.delay * 1.5, 30000);
+      connect(info.code, info.isCreator);
+    }, info.delay);
+  }
 
   // Cleanup on unmount
   useEffect(() => cleanup, [cleanup]);

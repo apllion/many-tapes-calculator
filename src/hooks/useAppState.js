@@ -145,6 +145,13 @@ function sharedReducer(state, action) {
     case 'SET_SETTING':
       return { ...state, settings: { ...state.settings, [action.key]: action.value } };
 
+    case 'SET_TEXT_STORE': {
+      const stores = [...(state.settings?.textStores || [])];
+      while (stores.length <= action.index) stores.push(null);
+      stores[action.index] = action.text;
+      return { ...state, settings: { ...state.settings, textStores: stores } };
+    }
+
     case 'ADD_TOTAL': {
       const name = action.name || `Total ${(state.totals || []).length + 1}`;
       return {
