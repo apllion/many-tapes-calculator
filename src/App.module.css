@@ -25,3 +25,24 @@
     grid-row: 2;
   }
 }
+
+.fullInput > *:nth-child(3) {
+  flex: 1;
+}
+
+@media (orientation: landscape) {
+  .app.fullInput {
+    grid-template-columns: 1fr 2fr 1fr;
+    grid-template-rows: 1fr;
+  }
+
+  .app.fullInput > *:nth-child(2) {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .app.fullInput > *:nth-child(3) {
+    grid-column: 2;
+    grid-row: 1;
+  }
+}

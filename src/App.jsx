@@ -16,6 +16,7 @@ export default function App() {
   const [totalConfigOpen, setTotalConfigOpen] = useState(false);
   const [configRequest, setConfigRequest] = useState(null);
   const [previewEntry, setPreviewEntry] = useState(null);
+  const [keypadMode, setKeypadMode] = useState('normal');
   // Autosave every 5 minutes, skip if nothing changed
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -39,6 +40,8 @@ export default function App() {
   }
 
   const settings = state.settings || {};
+
+  const showTape = !['tape', 'total', 'setup', 'saves', 'loads', 'room', 'text'].includes(keypadMode);
 
   const editingEntry = editingId
     ? activeTape.tape.find((e) => e.id === editingId) ?? null
@@ -66,7 +69,7 @@ export default function App() {
   }
 
   return (
-    <div className={styles.app}>
+    <div className={`${styles.app} ${!showTape ? styles.fullInput : ''}`}>
       <TapeSwitcher
         tapes={state.tapes}
         activeTapeId={state.activeTapeId}
@@ -74,10 +77,10 @@ export default function App() {
         activeTotalId={state.activeTotalId}
         dispatch={d}
         settings={settings}
-        onAddTape={() => { d({ type: 'ADD_TAPE' }); setConfigRequest('name'); }}
+        onAddTape={() => { d({ type: 'ADD_TAPE' }); setConfigRequest('tape'); }}
         onAddTotal={() => { d({ type: 'ADD_TOTAL' }); setConfigRequest('total'); }}
       />
-      {viewingTotal ? (
+      {showTape && (viewingTotal ? (
         <TotalTape total={activeTotal} tapes={state.tapes} settings={settings} dispatch={d} showDeselected={totalConfigOpen} />
       ) : (
         <Tape
@@ -88,7 +91,7 @@ export default function App() {
           settings={settings}
           previewEntry={previewEntry}
         />
-      )}
+      ))}
       <NumberInput
         dispatch={d}
         editingEntry={editingEntry}
@@ -108,6 +111,8 @@ export default function App() {
         configRequest={configRequest}
         onConfigDone={() => setConfigRequest(null)}
         onPreviewChange={setPreviewEntry}
+        fullMode={!showTape}
+        onKeypadModeChange={setKeypadMode}
       />
     </div>
   );

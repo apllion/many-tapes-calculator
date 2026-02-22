@@ -34,11 +34,12 @@ function downloadJSON(data, filename) {
   URL.revokeObjectURL(url);
 }
 
-export default function NumberInput({ dispatch, editingEntry, onDoneEditing, subtotal, currentSubProduct, storeSubtotal, storeSubProduct, activeTapeId, activeTapeName, activeTapeColor, appState, activeTotal, viewingTotal, sync, onTotalConfigChange, configRequest, onConfigDone, onPreviewChange }) {
+export default function NumberInput({ dispatch, editingEntry, onDoneEditing, subtotal, currentSubProduct, storeSubtotal, storeSubProduct, activeTapeId, activeTapeName, activeTapeColor, appState, activeTotal, viewingTotal, sync, onTotalConfigChange, configRequest, onConfigDone, onPreviewChange, fullMode, onKeypadModeChange }) {
   const [input, setInput] = useState('');
   const [keypadMode, setKeypadMode] = useState('normal');
   const [memoryValue, setMemoryValue] = useState(null);
-  const [textStores, setTextStores] = useState(Array(TEXT_STORE_COUNT).fill(null));
+  const rawStores = appState.settings?.textStores || [];
+  const textStores = Array.from({ length: TEXT_STORE_COUNT }, (_, i) => rawStores[i] || null);
   const [saves, setSaves] = useState([]);
   const [autosaves, setAutosaves] = useState([]);
   const textRef = useRef(null);
@@ -48,6 +49,11 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
   const saveLongRef = useRef(null);
   const addedTotalRef = useRef(false);
   const isEditing = editingEntry !== null;
+
+  // Notify parent when keypadMode changes
+  useEffect(() => {
+    onKeypadModeChange?.(keypadMode);
+  }, [keypadMode]);
 
   // When an entry is selected for editing, load its value into the display
   useEffect(() => {
@@ -61,9 +67,21 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
     }
   }, [editingEntry?.id]);
 
+  // When rotating to portrait with text in the input, switch to text mode
+  useEffect(() => {
+    const mql = window.matchMedia('(orientation: portrait)');
+    function handleChange(e) {
+      if (e.matches && keypadMode === 'normal' && input && isNaN(parseFloat(input))) {
+        setKeypadMode('text');
+      }
+    }
+    mql.addEventListener('change', handleChange);
+    return () => mql.removeEventListener('change', handleChange);
+  }, [keypadMode, input]);
+
   // Auto-focus text input when entering text/name/total keypad
   useEffect(() => {
-    if ((keypadMode === 'text' || keypadMode === 'name' || keypadMode === 'total' || keypadMode === 'saves' || keypadMode === 'room') && textRef.current) {
+    if ((keypadMode === 'text' || keypadMode === 'tape' || keypadMode === 'total' || keypadMode === 'saves' || keypadMode === 'room') && textRef.current) {
       textRef.current.focus();
     }
   }, [keypadMode]);
@@ -77,7 +95,7 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
 
   // Sync input when switching tapes while on name keypad
   useEffect(() => {
-    if (keypadMode === 'name' && !viewingTotal) {
+    if (keypadMode === 'tape' && !viewingTotal) {
       setInput(activeTapeName);
     }
   }, [activeTapeId]);
@@ -92,7 +110,7 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
         setKeypadMode('normal');
       }
     } else {
-      if (keypadMode === 'name' || keypadMode === 'total') {
+      if (keypadMode === 'tape' || keypadMode === 'total') {
         setInput('');
         setKeypadMode('normal');
       }
@@ -102,9 +120,9 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
   // Open config when a tape/total is added via TapeSwitcher
   useEffect(() => {
     if (!configRequest) return;
-    if (configRequest === 'name') {
+    if (configRequest === 'tape') {
       setInput(activeTapeName);
-      setKeypadMode('name');
+      setKeypadMode('tape');
     } else if (configRequest === 'total' && activeTotal) {
       setInput(activeTotal.name);
       setKeypadMode('total');
@@ -200,11 +218,7 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
 
   function textStoreAction(index) {
     if (input) {
-      setTextStores((prev) => {
-        const next = [...prev];
-        next[index] = input;
-        return next;
-      });
+      dispatch({ type: 'SET_TEXT_STORE', index, text: input });
       setInput('');
     } else if (textStores[index]) {
       dispatch({ type: 'ADD_ENTRY', op: 'text', value: 0, text: textStores[index] });
@@ -481,7 +495,7 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
     e.target.value = '';
   }
 
-  function leaveTapeConfig() {
+  function saveTapeName() {
     if (viewingTotal && activeTotal) {
       if (input && input !== activeTotal.name) {
         dispatch({ type: 'RENAME_TOTAL', totalId: activeTotal.id, name: input });
@@ -492,12 +506,6 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
       }
     }
     setInput('');
-    setKeypadMode('normal');
-  }
-
-  function setTapeColor(color) {
-    dispatch({ type: 'SET_TAPE_COLOR', tapeId: activeTapeId, color });
-    leaveTapeConfig();
   }
 
   const palette = appState.settings?.palette || DEFAULT_PALETTE;
@@ -523,9 +531,8 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
     colorLongRef.current = null;
     if (viewingTotal && activeTotal) {
       dispatch({ type: 'SET_TOTAL_COLOR', totalId: activeTotal.id, color: palette[index] });
-      leaveTapeConfig();
     } else {
-      setTapeColor(palette[index]);
+      dispatch({ type: 'SET_TAPE_COLOR', tapeId: activeTapeId, color: palette[index] });
     }
   }
   function onColorCancel() {
@@ -546,6 +553,22 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
     }
   }
 
+  // Reset all long-press refs when page resumes from suspension (iOS Safari)
+  useEffect(() => {
+    function onVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        for (const ref of [longPressRef, enterRef, clearRef, navRef, eqRef, minusRef, saveLongRef, colorLongRef]) {
+          if (ref.current !== null) {
+            if (ref.current !== 'fired') clearTimeout(ref.current);
+            ref.current = null;
+          }
+        }
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, []);
+
   const empty = <button className={styles.memBtnEmpty} disabled />;
 
   function renderKeypad() {
@@ -554,7 +577,7 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
       const hasMem = memoryValue !== null;
       return (
         <div className={styles.grid}>
-          <button className={`${styles.navBtn} ${styles.longPress}`} onPointerDown={navDown} onPointerUp={() => navUp(() => setKeypadMode('text'))} onPointerCancel={navCancel} onContextMenu={(e) => e.preventDefault()}>mem</button>
+          <button className={`${styles.navBtn} ${styles.longPress}`} onPointerDown={navDown} onPointerUp={() => navUp(() => { const landscape = window.matchMedia('(orientation: landscape)').matches; if (landscape) { setInput(viewingTotal && activeTotal ? activeTotal.name : activeTapeName); setKeypadMode(viewingTotal ? 'total' : 'tape'); } else { setKeypadMode('text'); } })} onPointerCancel={navCancel} onContextMenu={(e) => e.preventDefault()}>mem</button>
           {empty}{empty}{empty}
 
           <button className={styles.memBtn} onClick={act(memoryStore)}>
@@ -589,10 +612,10 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
       );
     }
 
-    if (keypadMode === 'text' && !window.matchMedia('(orientation: landscape)').matches) {
+    if (keypadMode === 'text') {
       return (
         <div className={styles.grid}>
-          <button className={`${styles.navBtn} ${styles.longPress}`} onPointerDown={navDown} onPointerUp={() => navUp(() => { setInput(viewingTotal && activeTotal ? activeTotal.name : activeTapeName); setKeypadMode(viewingTotal ? 'total' : 'name'); })} onPointerCancel={navCancel} onContextMenu={(e) => e.preventDefault()}>text</button>
+          <button className={`${styles.navBtn} ${styles.longPress}`} onPointerDown={navDown} onPointerUp={() => navUp(() => { setInput(viewingTotal && activeTotal ? activeTotal.name : activeTapeName); setKeypadMode(viewingTotal ? 'total' : 'tape'); })} onPointerCancel={navCancel} onContextMenu={(e) => e.preventDefault()}>text</button>
           <button
             className={`${styles.textBtn} ${styles.longPress}`}
             onPointerDown={onEnterDown}
@@ -656,7 +679,7 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
       );
     }
 
-    if (keypadMode === 'name') {
+    if (keypadMode === 'tape') {
       return (
         <div className={styles.grid}>
           <button className={`${styles.navBtn} ${styles.longPress}`} onPointerDown={navDown} onPointerUp={() => navUp(() => {
@@ -665,7 +688,7 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
             }
             setInput('');
             setKeypadMode('setup');
-          })} onPointerCancel={navCancel} onContextMenu={(e) => e.preventDefault()}>name</button>
+          })} onPointerCancel={navCancel} onContextMenu={(e) => e.preventDefault()}>tape</button>
           <button className={styles.fnBtn} onClick={() => dispatch({ type: 'MOVE_TAPE_LEFT', tapeId: activeTapeId })}>&larr;</button>
           <button className={styles.fnBtn} onClick={() => dispatch({ type: 'MOVE_TAPE_RIGHT', tapeId: activeTapeId })}>&rarr;</button>
           <button className={styles.fnBtn} style={{ fontSize: '0.55rem' }} onClick={() => dispatch({ type: 'SET_SETTING', key: 'palette', value: DEFAULT_PALETTE })}>Reset Colors</button>
@@ -690,7 +713,7 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
       const inRoom = sync.roomId !== null;
       return (
         <div className={styles.grid}>
-          <button className={`${styles.navBtn} ${styles.longPress}`} onPointerDown={navDown} onPointerUp={() => navUp(() => { setInput(''); setKeypadMode('setup'); })} onPointerCancel={navCancel} onContextMenu={(e) => e.preventDefault()}>room</button>
+          <button className={`${styles.navBtn} ${styles.longPress}`} onPointerDown={navDown} onPointerUp={() => navUp(() => { const landscape = window.matchMedia('(orientation: landscape)').matches; if (landscape) { setInput(viewingTotal && activeTotal ? activeTotal.name : activeTapeName); setKeypadMode(viewingTotal ? 'total' : 'tape'); } else { setInput(''); setKeypadMode('text'); } })} onPointerCancel={navCancel} onContextMenu={(e) => e.preventDefault()}>room</button>
           {!inRoom ? (
             <>
               <button className={styles.wideBtn} style={{ gridColumn: 'span 3' }} onClick={() => {
@@ -725,31 +748,6 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
     }
 
     if (keypadMode === 'saves') {
-      function onSaveItemDown(e, id, isAutosave) {
-        e.preventDefault();
-        saveLongRef.current = setTimeout(() => {
-          saveLongRef.current = 'fired';
-          const save = isAutosave ? getAutosave(id) : getSave(id);
-          if (save) {
-            addAutosave(appState);
-            dispatch({ type: 'LOAD_STATE', state: save.state });
-            setKeypadMode('normal');
-          }
-        }, 600);
-      }
-      function onSaveItemUp(name) {
-        if (saveLongRef.current === 'fired') {
-          saveLongRef.current = null;
-          return;
-        }
-        clearTimeout(saveLongRef.current);
-        saveLongRef.current = null;
-        setInput(name);
-      }
-      function onSaveItemCancel() {
-        clearTimeout(saveLongRef.current);
-        saveLongRef.current = null;
-      }
       function doSave() {
         const name = input.trim() || `Save ${saves.length + 1}`;
         addSave(name, appState);
@@ -759,18 +757,46 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
       return (
         <div className={styles.savesContainer}>
           <div className={styles.savesHeader}>
-            <button className={`${styles.navBtn} ${styles.longPress}`} onPointerDown={navDown} onPointerUp={() => navUp(() => setKeypadMode('setup'))} onPointerCancel={navCancel} onContextMenu={(e) => e.preventDefault()}>saves</button>
-            <button className={styles.wideBtn} onClick={doSave}>Save</button>
+            <button className={`${styles.navBtn} ${styles.longPress}`} onPointerDown={navDown} onPointerUp={() => navUp(() => { setSaves(loadSaves()); setAutosaves(loadAutosaves()); setInput(''); setKeypadMode('loads'); })} onPointerCancel={navCancel} onContextMenu={(e) => e.preventDefault()}>SAVE</button>
+            <button className={styles.wideBtn} onClick={doSave}>SAVE</button>
+          </div>
+          <div className={styles.savesList}>
+            {saves.map((s) => (
+              <div key={s.id} className={styles.saveItem}>
+                <span className={styles.saveName}>{s.name}</span>
+                <span className={styles.saveDate}>{relativeTime(s.timestamp)}</span>
+              </div>
+            ))}
+            {saves.length === 0 && (
+              <div className={styles.saveItem} style={{ justifyContent: 'center', color: 'var(--color-text-muted)' }}>
+                No saves yet
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    if (keypadMode === 'loads') {
+      function loadSaveItem(id, isAutosave) {
+        const save = isAutosave ? getAutosave(id) : getSave(id);
+        if (save) {
+          addAutosave(appState);
+          dispatch({ type: 'LOAD_STATE', state: save.state });
+          setKeypadMode('normal');
+        }
+      }
+      return (
+        <div className={styles.savesContainer}>
+          <div className={styles.savesHeader}>
+            <button className={`${styles.navBtn} ${styles.longPress}`} onPointerDown={navDown} onPointerUp={() => navUp(() => { setInput(''); setKeypadMode('room'); })} onPointerCancel={navCancel} onContextMenu={(e) => e.preventDefault()}>LOAD</button>
           </div>
           <div className={styles.savesList}>
             {saves.map((s) => (
               <div
                 key={s.id}
-                className={`${styles.saveItem} ${styles.longPress}`}
-                onPointerDown={(e) => onSaveItemDown(e, s.id, false)}
-                onPointerUp={() => onSaveItemUp(s.name)}
-                onPointerCancel={onSaveItemCancel}
-                onContextMenu={(e) => e.preventDefault()}
+                className={styles.saveItem}
+                onClick={() => loadSaveItem(s.id, false)}
               >
                 <span className={styles.saveName}>{s.name}</span>
                 <span className={styles.saveDate}>{relativeTime(s.timestamp)}</span>
@@ -793,11 +819,8 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
                 {autosaves.map((s) => (
                   <div
                     key={s.id}
-                    className={`${styles.saveItem} ${styles.longPress}`}
-                    onPointerDown={(e) => onSaveItemDown(e, s.id, true)}
-                    onPointerUp={() => onSaveItemUp(s.name)}
-                    onPointerCancel={onSaveItemCancel}
-                    onContextMenu={(e) => e.preventDefault()}
+                    className={styles.saveItem}
+                    onClick={() => loadSaveItem(s.id, true)}
                   >
                     <span className={styles.saveName}>{s.name}</span>
                     <span className={styles.saveDate}>{relativeTime(s.timestamp)}</span>
@@ -816,7 +839,7 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
       const calcMode = appState.settings?.calculationMode || 'arithmetic';
       return (
         <div className={styles.grid}>
-          <button className={`${styles.navBtn} ${styles.longPress}`} onPointerDown={navDown} onPointerUp={() => navUp(() => setKeypadMode('normal'))} onPointerCancel={navCancel} onContextMenu={(e) => e.preventDefault()}>setup</button>
+          <button className={`${styles.navBtn} ${styles.longPress}`} onPointerDown={navDown} onPointerUp={() => navUp(() => { setSaves(loadSaves()); setAutosaves(loadAutosaves()); setKeypadMode('saves'); })} onPointerCancel={navCancel} onContextMenu={(e) => e.preventDefault()}>setup</button>
           {empty}{empty}{empty}
 
           {FORMAT_ORDER.map((key) => (
@@ -843,16 +866,8 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
           >
             {calcMode === 'adding' ? 'Adding Machine' : 'Arithmetic'}
           </button>
-          <button className={styles.wideBtn} style={{ gridColumn: 'span 2' }} onClick={act(exportAll)}>Export</button>
-          <button className={styles.wideBtn} style={{ gridColumn: 'span 2' }} onClick={act(importData)}>Import</button>
-          <button className={styles.wideBtn} style={{ gridColumn: 'span 2' }} onClick={() => { setSaves(loadSaves()); setAutosaves(loadAutosaves()); setKeypadMode('saves'); }}>Saves</button>
-          <button
-            className={`${styles.wideBtn} ${sync.roomId ? styles.toggleOn : ''}`}
-            style={{ gridColumn: 'span 2' }}
-            onClick={() => { setInput(''); setKeypadMode('room'); }}
-          >
-            {sync.roomId ? `Room: ${sync.roomId}` : 'Room'}
-          </button>
+          <button className={styles.wideBtn} style={{ gridColumn: 'span 2' }} onClick={exportAll}>Export</button>
+          <button className={styles.wideBtn} style={{ gridColumn: 'span 2' }} onClick={importData}>Import</button>
         </div>
       );
     }
@@ -889,7 +904,7 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
           >C</button>
         </div>
         <div className={styles.grid}>
-        <button className={`${styles.navBtn} ${styles.longPress}`} onPointerDown={navDown} onPointerUp={() => navUp(() => { const landscape = window.matchMedia('(orientation: landscape)').matches; if (landscape) { setInput(viewingTotal ? activeTotal.name : activeTapeName); setKeypadMode(viewingTotal ? 'total' : 'name'); } else { setKeypadMode(viewingTotal ? 'text' : 'mem'); } })} onPointerCancel={navCancel} onContextMenu={(e) => e.preventDefault()}>calc</button>
+        <button className={`${styles.navBtn} ${styles.longPress}`} onPointerDown={navDown} onPointerUp={() => navUp(() => setKeypadMode('mem'))} onPointerCancel={navCancel} onContextMenu={(e) => e.preventDefault()}>calc</button>
         <button className={styles.fnBtn} onClick={backspace}>&larr;</button>
         <button className={styles.opBtn} onClick={opDisabled ? undefined : () => submit('/')} disabled={opDisabled}>&divide;</button>
         <button className={styles.opBtn} onClick={opDisabled ? undefined : () => submit('*')} disabled={opDisabled}>&times;</button>
@@ -934,23 +949,62 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
     );
   }
 
-  const isTextInput = keypadMode === 'text' || keypadMode === 'name' || keypadMode === 'total' || keypadMode === 'saves' || keypadMode === 'room';
+  const isTextInput = keypadMode === 'text' || keypadMode === 'tape' || keypadMode === 'total' || keypadMode === 'saves' || keypadMode === 'room';
 
   function getDisplayLabel() {
     if (isEditing) return 'EDIT';
     if (keypadMode === 'text') return 'TEXT';
     if (keypadMode === 'total') return '\u03A3 NAME';
-    if (keypadMode === 'name') return 'NAME';
+    if (keypadMode === 'tape') return 'TAPE';
     if (keypadMode === 'setup') return 'SETUP';
-    if (keypadMode === 'saves') return 'SAVES';
+    if (keypadMode === 'saves') return 'SAVE';
+    if (keypadMode === 'loads') return 'LOAD';
     if (keypadMode === 'room') return 'ROOM';
     if (viewingTotal) return '\u03A3';
     return formatValue(currentSubProduct !== null ? currentSubProduct : subtotal);
   }
 
-  return (
+  const displayContent = (
     <>
-      <div className={styles.textSidebar}>
+      <input type="file" accept=".json" ref={fileRef} onChange={handleImportFile} style={{ display: 'none' }} />
+      <input type="color" ref={colorRef} onChange={onColorChange} style={{ display: 'none' }} />
+      <div className={styles.display}>
+        <span className={styles.subtotal}>
+          {getDisplayLabel()}
+        </span>
+        {isTextInput ? (
+          <input
+            ref={textRef}
+            type="text"
+            className={styles.textInput}
+            value={input}
+            onChange={(e) => setInput(keypadMode === 'room' ? e.target.value.toUpperCase() : e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                if (keypadMode === 'room') {
+                  const code = input.trim();
+                  if (code.length >= 4) { sync.joinRoom(code); setInput(''); }
+                } else if (keypadMode === 'saves') {
+                  const name = input.trim() || `Save ${saves.length + 1}`;
+                  addSave(name, appState);
+                  setInput('');
+                  setSaves(loadSaves());
+                } else if (keypadMode === 'text') { submitText(); setKeypadMode('normal'); }
+                else { saveTapeName(); }
+              }
+            }}
+            style={keypadMode === 'room' ? { textTransform: 'uppercase' } : undefined}
+            placeholder={keypadMode === 'room' ? 'Room code…' : keypadMode === 'saves' ? 'Save name…' : keypadMode === 'text' ? 'Type text…' : viewingTotal ? 'Total name…' : 'Tape name…'}
+          />
+        ) : (
+          <span>{input || '0'}</span>
+        )}
+      </div>
+    </>
+  );
+
+  const textSidebarContent = (
+    <div className={styles.textSidebar}>
         <button
           className={`${styles.textBtn} ${keypadMode === 'text' ? styles.toggleOn : ''}`}
           onClick={() => setKeypadMode(keypadMode === 'text' ? 'normal' : 'text')}
@@ -976,42 +1030,29 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
             {stored ? (stored.length > 5 ? stored.slice(0, 5) + '\u2026' : stored) : ''}
           </button>
         ))}
-      </div>
-      <div className={`${styles.container} ${isEditing ? styles.editing : ''}`}>
-        <input type="file" accept=".json" ref={fileRef} onChange={handleImportFile} style={{ display: 'none' }} />
-        <input type="color" ref={colorRef} onChange={onColorChange} style={{ display: 'none' }} />
-        <div className={styles.display}>
-          <span className={styles.subtotal}>
-            {getDisplayLabel()}
-          </span>
-          {isTextInput ? (
-            <input
-              ref={textRef}
-              type="text"
-              className={styles.textInput}
-              value={input}
-              onChange={(e) => setInput(keypadMode === 'room' ? e.target.value.toUpperCase() : e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  if (keypadMode === 'room') {
-                    const code = input.trim();
-                    if (code.length >= 4) { sync.joinRoom(code); setInput(''); }
-                  } else if (keypadMode === 'saves') {
-                    const name = input.trim() || `Save ${saves.length + 1}`;
-                    addSave(name, appState);
-                    setInput('');
-                    setSaves(loadSaves());
-                  } else if (keypadMode === 'text') { submitText(); setKeypadMode('normal'); }
-                  else { leaveTapeConfig(); }
-                }
-              }}
-              style={keypadMode === 'room' ? { textTransform: 'uppercase' } : undefined}
-              placeholder={keypadMode === 'room' ? 'Room code…' : keypadMode === 'saves' ? 'Save name…' : keypadMode === 'text' ? 'Type text…' : viewingTotal ? 'Total name…' : 'Tape name…'}
-            />
-          ) : (
-            <span>{input || '0'}</span>
-          )}
+    </div>
+  );
+
+  if (fullMode) {
+    return (
+      <>
+        {textSidebarContent}
+        <div className={`${styles.fullPanel} ${isEditing ? styles.editing : ''}`}>
+          {displayContent}
+          <button className={styles.calcBtn} onClick={() => { saveTapeName(); setKeypadMode('normal'); }}>BACK</button>
+          <div className={styles.fullContent}>
+            {renderKeypad()}
+          </div>
         </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      {textSidebarContent}
+      <div className={`${styles.container} ${isEditing ? styles.editing : ''}`}>
+        {displayContent}
         {renderKeypad()}
       </div>
     </>

@@ -100,6 +100,22 @@
   background: #ccc;
 }
 
+.calcBtn {
+  align-self: stretch;
+  height: var(--btn-height);
+  background: #9b59b6;
+  color: white;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  border-radius: var(--radius);
+  margin-bottom: var(--space-xs);
+}
+
+.calcBtn:hover {
+  background: #8344a0;
+}
+
 .navBtn {
   background: #9b59b6;
   color: white;
@@ -274,8 +290,15 @@
   width: 25%;
 }
 
-.savesHeader > button:last-child {
+.savesHeader > button:last-child:not(:first-child) {
   flex: 1;
+}
+
+.savesInfo {
+  text-align: center;
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  padding: 2px 0;
 }
 
 .savesList {
@@ -416,6 +439,33 @@
 
 .memColumn {
   display: none;
+}
+
+.fullPanel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  background: var(--color-surface);
+  padding: var(--space-sm) var(--space-md) var(--space-md);
+}
+
+.fullContent {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.fullContent .grid {
+  max-height: none;
+  overflow-y: auto;
+}
+
+.fullContent .savesContainer {
+  flex: 1;
+  min-height: 0;
+  height: auto;
 }
 
 @media (orientation: landscape) {
