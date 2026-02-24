@@ -762,7 +762,11 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
           </div>
           <div className={styles.savesList}>
             {saves.map((s) => (
-              <div key={s.id} className={styles.saveItem}>
+              <div key={s.id} className={styles.saveItem} onClick={() => {
+                deleteSave(s.id);
+                addSave(s.name, appState);
+                setSaves(loadSaves());
+              }}>
                 <span className={styles.saveName}>{s.name}</span>
                 <span className={styles.saveDate}>{relativeTime(s.timestamp)}</span>
               </div>
@@ -1007,7 +1011,7 @@ export default function NumberInput({ dispatch, editingEntry, onDoneEditing, sub
     <div className={styles.textSidebar}>
         <button
           className={`${styles.textBtn} ${keypadMode === 'text' ? styles.toggleOn : ''}`}
-          onClick={() => setKeypadMode(keypadMode === 'text' ? 'normal' : 'text')}
+          onClick={() => { if (keypadMode === 'text') { setKeypadMode('normal'); } else if (!window.matchMedia('(orientation: landscape)').matches) { setKeypadMode('text'); } }}
         >TEXT</button>
         <button
           className={`${styles.textBtn} ${styles.longPress}`}

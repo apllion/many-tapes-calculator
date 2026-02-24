@@ -41,7 +41,7 @@ export default function App() {
 
   const settings = state.settings || {};
 
-  const showTape = !['tape', 'total', 'setup', 'saves', 'loads', 'room', 'text'].includes(keypadMode);
+  const showTape = !['tape', 'setup', 'saves', 'loads', 'room', 'text'].includes(keypadMode);
 
   const editingEntry = editingId
     ? activeTape.tape.find((e) => e.id === editingId) ?? null
