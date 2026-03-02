@@ -10,7 +10,7 @@ import NumberInput from './components/NumberInput/NumberInput.jsx';
 import styles from './App.module.css';
 
 export default function App() {
-  const { state, dispatch, rawDispatch, activeTape, activeTotal } = useAppState();
+  const { state, dispatch, rawDispatch, activeTape } = useAppState();
   const sync = useSync(state, rawDispatch);
   const d = sync.syncDispatch;
   const [editingId, setEditingId] = useState(null);
@@ -19,6 +19,10 @@ export default function App() {
   const [configRequest, setConfigRequest] = useState(null);
   const [previewEntry, setPreviewEntry] = useState(null);
   const [keypadMode, setKeypadMode] = useState('normal');
+  const [clearMode, setClearMode] = useState(false);
+  const clearModeTimer = useRef(null);
+
+  const viewingTotal = !!activeTape.totalConfig;
   // Autosave every 5 minutes, skip if nothing changed
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -33,8 +37,6 @@ export default function App() {
     }, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
-
-  const viewingTotal = activeTotal !== null;
 
   // Clear editing when switching to total view
   if (viewingTotal && editingId) {
@@ -68,15 +70,38 @@ export default function App() {
       <TapeSwitcher
         tapes={state.tapes}
         activeTapeId={state.activeTapeId}
-        totals={state.totals || []}
-        activeTotalId={state.activeTotalId}
         dispatch={d}
         settings={settings}
         onAddTape={() => { d({ type: 'ADD_TAPE' }); setConfigRequest('tape'); }}
-        onAddTotal={() => { d({ type: 'ADD_TOTAL' }); setConfigRequest('total'); }}
+        onAddTotal={() => { d({ type: 'ADD_TAPE', totalConfig: { startingValue: 0, members: [] } }); setConfigRequest('total'); }}
+        clearMode={clearMode}
+        onClearTape={(tapeId) => {
+          d({ type: 'DELETE_TAPE', tapeId });
+          setClearMode(false);
+          clearTimeout(clearModeTimer.current);
+        }}
       />
       {viewingTotal ? (
-        <TotalTape total={activeTotal} tapes={state.tapes} settings={settings} dispatch={d} showDeselected={totalConfigOpen} />
+        <TotalTape tape={activeTape} tapes={state.tapes} settings={settings} dispatch={d} showDeselected={totalConfigOpen} />
+      ) : clearMode ? (
+        <div
+          className={styles.clearModeTape}
+          onClick={() => {
+            d({ type: 'CLEAR_TAPE' });
+            setClearMode(false);
+            clearTimeout(clearModeTimer.current);
+          }}
+        >
+          <Tape
+            tape={activeTape.tape}
+            dispatch={d}
+            editingId={editingId}
+            editingMode={editingMode}
+            onSelect={handleSelect}
+            settings={settings}
+            previewEntry={previewEntry}
+          />
+        </div>
       ) : (
         <Tape
           tape={activeTape.tape}
@@ -100,7 +125,7 @@ export default function App() {
         activeTapeName={activeTape.name}
         activeTapeColor={activeTape.color || null}
         appState={state}
-        activeTotal={activeTotal}
+        activeTape={activeTape}
         viewingTotal={viewingTotal}
         sync={sync}
         onTotalConfigChange={setTotalConfigOpen}
@@ -108,6 +133,9 @@ export default function App() {
         onConfigDone={() => setConfigRequest(null)}
         onPreviewChange={setPreviewEntry}
         onKeypadModeChange={setKeypadMode}
+        clearMode={clearMode}
+        setClearMode={setClearMode}
+        clearModeTimer={clearModeTimer}
       />
     </div>
   );

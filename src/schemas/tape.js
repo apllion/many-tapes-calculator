@@ -2,7 +2,7 @@ export {
   TapeEntrySchema,
   TapeSchema,
   TotalMemberSchema,
-  TotalSchema,
+  TotalConfigSchema,
   SettingsSchema,
   AppStateSchema,
 } from '../../shared/schemas.js';

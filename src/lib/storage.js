@@ -1,6 +1,6 @@
 import * as v from 'valibot';
 import { AppStateSchema } from '../schemas/tape.js';
-import { createDefaultState, migrateKeys } from '../../shared/defaults.js';
+import { createDefaultState, migrateState } from '../../shared/defaults.js';
 
 const STORAGE_KEY = 'many-tapes-calculator';
 
@@ -9,7 +9,7 @@ export function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return createDefaultState();
     const parsed = JSON.parse(raw);
-    const migrated = migrateKeys(parsed);
+    const migrated = migrateState(parsed);
     return v.parse(AppStateSchema, migrated);
   } catch {
     return createDefaultState();

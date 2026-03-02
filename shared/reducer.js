@@ -9,7 +9,7 @@ export function mapTape(state, tapeId, fn) {
   };
 }
 
-// Actions that affect shared state (tapes, totals, settings)
+// Actions that affect shared state (tapes, settings)
 export function sharedReducer(state, action) {
   switch (action.type) {
     case 'ADD_ENTRY':
@@ -107,12 +107,21 @@ export function sharedReducer(state, action) {
       return mapTape(state, action.tapeId, (a) => ({ ...a, tape: [] }));
 
     case 'ADD_TAPE': {
-      const name = `Tape ${state.tapes.length + 1}`;
+      const isTotal = !!action.totalConfig;
+      const plainCount = state.tapes.filter((t) => !t.totalConfig).length;
+      const totalCount = state.tapes.filter((t) => !!t.totalConfig).length;
+      const name = isTotal ? `Total ${totalCount + 1}` : `Tape ${plainCount + 1}`;
       return {
         ...state,
         tapes: [
           ...state.tapes,
-          { id: action.id, name, tape: [], createdAt: Date.now() },
+          {
+            id: action.id,
+            name,
+            tape: [],
+            createdAt: Date.now(),
+            ...(action.totalConfig ? { totalConfig: action.totalConfig } : {}),
+          },
         ],
       };
     }
@@ -120,13 +129,14 @@ export function sharedReducer(state, action) {
     case 'DELETE_TAPE': {
       if (state.tapes.length <= 1) return state;
       const remaining = state.tapes.filter((a) => a.id !== action.tapeId);
+      // Clean up totalConfig members referencing deleted tape
       return {
         ...state,
-        tapes: remaining,
-        totals: (state.totals || []).map((s) => ({
-          ...s,
-          members: s.members.filter((m) => m.accountId !== action.tapeId),
-        })),
+        tapes: remaining.map((t) =>
+          t.totalConfig
+            ? { ...t, totalConfig: { ...t.totalConfig, members: t.totalConfig.members.filter((m) => m.accountId !== action.tapeId) } }
+            : t
+        ),
       };
     }
 
@@ -169,81 +179,32 @@ export function sharedReducer(state, action) {
       return { ...state, settings: { ...state.settings, shortcutStores: stores } };
     }
 
-    case 'ADD_TOTAL': {
-      const name = action.name || `Total ${(state.totals || []).length + 1}`;
-      return {
-        ...state,
-        totals: [...(state.totals || []), { id: action.id, name, startingValue: 0, members: [] }],
-      };
-    }
-
-    case 'DELETE_TOTAL': {
-      const totals = (state.totals || []).filter((s) => s.id !== action.totalId);
-      return { ...state, totals };
-    }
-
-    case 'RENAME_TOTAL':
-      return {
-        ...state,
-        totals: (state.totals || []).map((s) =>
-          s.id === action.totalId ? { ...s, name: action.name } : s
-        ),
-      };
-
     case 'SET_TOTAL_STARTING_VALUE':
-      return {
-        ...state,
-        totals: (state.totals || []).map((s) =>
-          s.id === action.totalId ? { ...s, startingValue: action.value } : s
-        ),
-      };
+      return mapTape(state, action.tapeId, (t) => ({
+        ...t,
+        totalConfig: { ...t.totalConfig, startingValue: action.value },
+      }));
 
     case 'TOGGLE_TOTAL_MEMBER': {
-      return {
-        ...state,
-        totals: (state.totals || []).map((s) => {
-          if (s.id !== action.totalId) return s;
-          const existing = s.members.find((m) => m.accountId === action.tapeId);
-          if (!existing) {
-            return { ...s, members: [...s.members, { accountId: action.tapeId, sign: '+' }] };
-          }
-          if (existing.sign === '+') {
-            return { ...s, members: s.members.map((m) => m.accountId === action.tapeId ? { ...m, sign: '-' } : m) };
-          }
-          return { ...s, members: s.members.filter((m) => m.accountId !== action.tapeId) };
-        }),
-      };
+      return mapTape(state, action.totalTapeId, (t) => {
+        const members = t.totalConfig?.members || [];
+        const existing = members.find((m) => m.accountId === action.tapeId);
+        let newMembers;
+        if (!existing) {
+          newMembers = [...members, { accountId: action.tapeId, sign: '+' }];
+        } else if (existing.sign === '+') {
+          newMembers = members.map((m) => m.accountId === action.tapeId ? { ...m, sign: '-' } : m);
+        } else {
+          newMembers = members.filter((m) => m.accountId !== action.tapeId);
+        }
+        return { ...t, totalConfig: { ...t.totalConfig, members: newMembers } };
+      });
     }
-
-    case 'MOVE_TOTAL_LEFT': {
-      const totals = [...(state.totals || [])];
-      const idx = totals.findIndex((s) => s.id === action.totalId);
-      if (idx <= 0) return state;
-      [totals[idx - 1], totals[idx]] = [totals[idx], totals[idx - 1]];
-      return { ...state, totals };
-    }
-
-    case 'MOVE_TOTAL_RIGHT': {
-      const totals = [...(state.totals || [])];
-      const idx = totals.findIndex((s) => s.id === action.totalId);
-      if (idx < 0 || idx >= totals.length - 1) return state;
-      [totals[idx], totals[idx + 1]] = [totals[idx + 1], totals[idx]];
-      return { ...state, totals };
-    }
-
-    case 'SET_TOTAL_COLOR':
-      return {
-        ...state,
-        totals: (state.totals || []).map((s) =>
-          s.id === action.totalId ? { ...s, color: action.color } : s
-        ),
-      };
 
     case 'SYNC_STATE':
       return {
         ...state,
         tapes: action.tapes,
-        totals: action.totals,
         settings: action.settings,
       };
 
@@ -255,20 +216,14 @@ export function sharedReducer(state, action) {
   }
 }
 
-// Actions that affect local view state (which tape/total the user is looking at)
+// Actions that affect local view state (which tape the user is looking at)
 export function localReducer(state, action) {
   switch (action.type) {
     case 'SET_ACTIVE':
-      return { ...state, activeTapeId: action.tapeId, activeTotalId: null };
-
-    case 'SET_ACTIVE_TOTAL':
-      return { ...state, activeTotalId: action.totalId };
+      return { ...state, activeTapeId: action.tapeId };
 
     case 'ADD_TAPE':
       return { ...state, activeTapeId: action.id };
-
-    case 'ADD_TOTAL':
-      return { ...state, activeTotalId: action.id };
 
     case 'DELETE_TAPE': {
       if (state.activeTapeId === action.tapeId) {
@@ -277,12 +232,6 @@ export function localReducer(state, action) {
       }
       return state;
     }
-
-    case 'DELETE_TOTAL':
-      if (state.activeTotalId === action.totalId) {
-        return { ...state, activeTotalId: null };
-      }
-      return state;
 
     case 'LOAD_STATE':
       return state; // LOAD_STATE fully replaces via sharedReducer, including activeTapeId
@@ -295,12 +244,8 @@ export function localReducer(state, action) {
 export function fixDanglingPointers(state) {
   let next = state;
   const tapeIds = new Set(state.tapes.map((a) => a.id));
-  const totalIds = new Set((state.totals || []).map((s) => s.id));
   if (!tapeIds.has(next.activeTapeId)) {
     next = { ...next, activeTapeId: state.tapes[0].id };
-  }
-  if (next.activeTotalId && !totalIds.has(next.activeTotalId)) {
-    next = { ...next, activeTotalId: null };
   }
   return next;
 }
@@ -324,9 +269,14 @@ export function enrichAction(action, state) {
   const needsTapeId = [
     'ADD_ENTRY', 'ADD_ENTRY_AND_TOTAL', 'INSERT_ENTRY',
     'UPDATE_ENTRY', 'DELETE_ENTRY', 'CLEAR_TAPE',
+    'SET_TOTAL_STARTING_VALUE',
   ];
   if (needsTapeId.includes(action.type) && !action.tapeId) {
     enriched.tapeId = state.activeTapeId;
+  }
+  // TOGGLE_TOTAL_MEMBER uses totalTapeId (the total-type tape being modified)
+  if (action.type === 'TOGGLE_TOTAL_MEMBER' && !action.totalTapeId) {
+    enriched.totalTapeId = state.activeTapeId;
   }
 
   // Pre-generate IDs for actions that create entities
@@ -345,9 +295,6 @@ export function enrichAction(action, state) {
       }
       break;
     case 'ADD_TAPE':
-      if (!enriched.id) enriched.id = generateId();
-      break;
-    case 'ADD_TOTAL':
       if (!enriched.id) enriched.id = generateId();
       break;
   }

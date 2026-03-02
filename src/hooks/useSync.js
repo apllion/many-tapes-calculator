@@ -14,12 +14,11 @@ function generateRoomCode() {
 }
 
 // Actions that are purely local and should not be broadcast
-const LOCAL_ONLY_ACTIONS = new Set(['SET_ACTIVE', 'SET_ACTIVE_TOTAL']);
+const LOCAL_ONLY_ACTIONS = new Set(['SET_ACTIVE']);
 
 function getSharedState(state) {
   return {
     tapes: state.tapes,
-    totals: state.totals || [],
     settings: state.settings || {},
   };
 }
@@ -35,6 +34,7 @@ export function useSync(state, rawDispatch) {
   const stateRef = useRef(state);
   stateRef.current = state;
   const reconnectRef = useRef(null); // { code, isCreator, timer, delay }
+  const heartbeatRef = useRef(null);
 
   const clearReconnect = useCallback(() => {
     if (reconnectRef.current?.timer) {
@@ -45,6 +45,10 @@ export function useSync(state, rawDispatch) {
 
   const cleanup = useCallback(() => {
     clearReconnect();
+    if (heartbeatRef.current) {
+      clearInterval(heartbeatRef.current);
+      heartbeatRef.current = null;
+    }
     if (roomRef.current) {
       roomRef.current.leave();
       roomRef.current = null;
@@ -58,6 +62,10 @@ export function useSync(state, rawDispatch) {
 
   const connect = useCallback((code, isCreator) => {
     // Clean up any existing room (but keep reconnect info)
+    if (heartbeatRef.current) {
+      clearInterval(heartbeatRef.current);
+      heartbeatRef.current = null;
+    }
     if (roomRef.current) {
       roomRef.current.leave();
       roomRef.current = null;
@@ -71,7 +79,7 @@ export function useSync(state, rawDispatch) {
     // Store reconnect info
     if (!reconnectRef.current || reconnectRef.current.code !== code) {
       clearReconnect();
-      reconnectRef.current = { code, isCreator, timer: null, delay: 2000 };
+      reconnectRef.current = { code, isCreator, timer: null, delay: 1000 };
     }
 
     let room;
@@ -89,15 +97,24 @@ export function useSync(state, rawDispatch) {
 
     const [sendAction, onAction] = room.makeAction('action');
     const [sendState, onState] = room.makeAction('state');
+    const [sendPing, onPing] = room.makeAction('ping');
 
     sendActionRef.current = sendAction;
     sendStateRef.current = sendState;
+
+    // Heartbeat ping every 15s
+    const heartbeatInterval = setInterval(() => {
+      if (Object.keys(room.getPeers()).length > 0) {
+        sendPing({ t: Date.now() });
+      }
+    }, 15000);
+    onPing(() => {}); // receipt updates Trystero's internal tracking
 
     room.onPeerJoin((peerId) => {
       setPeerCount(Object.keys(room.getPeers()).length);
       setStatus('connected');
       // Reset reconnect delay on successful connection
-      if (reconnectRef.current) reconnectRef.current.delay = 2000;
+      if (reconnectRef.current) reconnectRef.current.delay = 1000;
       // Only send state if we're established (creator or already synced)
       if (established) {
         sendState(getSharedState(stateRef.current), peerId);
@@ -124,11 +141,13 @@ export function useSync(state, rawDispatch) {
       rawDispatch({
         type: 'SYNC_STATE',
         tapes: sharedState.tapes,
-        totals: sharedState.totals,
         settings: sharedState.settings,
         _remote: true,
       });
     });
+
+    // Return cleanup for heartbeat
+    heartbeatRef.current = heartbeatInterval;
   }, [rawDispatch, clearReconnect]);
 
   function scheduleReconnect() {
@@ -143,6 +162,24 @@ export function useSync(state, rawDispatch) {
 
   // Cleanup on unmount
   useEffect(() => cleanup, [cleanup]);
+
+  // Visibility-based immediate reconnect
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState !== 'visible') return;
+      const info = reconnectRef.current;
+      if (!info) return;
+      // Force immediate reconnect attempt with reset delay
+      if (info.timer) {
+        clearTimeout(info.timer);
+        info.timer = null;
+      }
+      info.delay = 1000;
+      connect(info.code, info.isCreator);
+    }
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [connect]);
 
   const createRoom = useCallback(() => {
     const code = generateRoomCode();

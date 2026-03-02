@@ -47,29 +47,13 @@
   color: white;
 }
 
-.close {
-  font-size: 0.9rem;
-  line-height: 1;
-  opacity: 0.6;
-  transition: opacity 0.15s;
-  margin-left: auto;
-  flex-shrink: 0;
-  user-select: none;
-  -webkit-user-select: none;
-  touch-action: none;
-}
-
-.close:hover {
-  opacity: 1;
-}
-
-.tab.active .close:hover {
-  opacity: 1;
-}
-
 .totalTab {
   font-weight: 700;
   font-size: 1rem;
+}
+
+.clearModeTab {
+  box-shadow: inset 0 0 0 2px #d44;
 }
 
 .addBtn {

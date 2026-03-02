@@ -4,24 +4,28 @@ import { formatNumber } from '../../lib/format.js';
 import tapeStyles from '../Tape/Tape.module.css';
 import entryStyles from '../TapeEntry/TapeEntry.module.css';
 
-export default function TotalTape({ total, tapes, settings, dispatch, showDeselected }) {
+export default function TotalTape({ tape, tapes, settings, dispatch, showDeselected }) {
   const containerRef = useRef(null);
+  const config = tape.totalConfig;
   useEffect(() => {
     if (containerRef.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
-  }, [total.id]);
+  }, [tape.id]);
   const fmt = settings?.numberFormat;
   const memberMap = {};
-  (total.members || []).forEach((m) => { memberMap[m.accountId] = m.sign; });
+  (config.members || []).forEach((m) => { memberMap[m.accountId] = m.sign; });
 
-  let grandTotal = total.startingValue || 0;
+  let grandTotal = config.startingValue || 0;
 
-  const tapeRows = tapes.map((tape) => {
-    const sign = memberMap[tape.id] || null;
+  // Filter out self from the member list
+  const otherTapes = tapes.filter((t) => t.id !== tape.id);
+
+  const tapeRows = otherTapes.map((t) => {
+    const sign = memberMap[t.id] || null;
     const isMember = sign !== null;
     if (!isMember && !showDeselected) return null;
-    const { totals } = computeRunningTotals(tape.tape, settings?.calculationMode);
+    const { totals } = computeRunningTotals(t.tape, settings?.calculationMode);
     const subtotal = totals.length > 0 ? totals[totals.length - 1] : 0;
     const signedValue = sign === '-' ? -subtotal : subtotal;
     if (isMember) grandTotal += signedValue;
@@ -29,7 +33,7 @@ export default function TotalTape({ total, tapes, settings, dispatch, showDesele
 
     return (
       <div
-        key={tape.id}
+        key={t.id}
         className={`${entryStyles.row} ${entryStyles.subtotalRow}`}
         style={{
           cursor: 'pointer',
@@ -39,13 +43,13 @@ export default function TotalTape({ total, tapes, settings, dispatch, showDesele
           borderBottomColor: 'var(--color-border)',
           opacity: isMember ? 1 : 0.4,
         }}
-        onClick={() => dispatch({ type: 'TOGGLE_TOTAL_MEMBER', totalId: total.id, tapeId: tape.id })}
+        onClick={() => dispatch({ type: 'TOGGLE_TOTAL_MEMBER', totalTapeId: tape.id, tapeId: t.id })}
       >
         <span
           className={entryStyles.value}
-          style={isMember && tape.color ? { color: tape.color, fontWeight: 700 } : { fontWeight: 700 }}
+          style={isMember && t.color ? { color: t.color, fontWeight: 700 } : { fontWeight: 700 }}
         >
-          {isMember ? (sign === '-' ? '\u2212' : '+') + ' ' : ''}{tape.name}
+          {isMember ? (sign === '-' ? '\u2212' : '+') + ' ' : ''}{t.name}
         </span>
         <span />
         <span className={`${entryStyles.total} ${entryStyles.subtotalValue} ${isNegative ? entryStyles.negative : entryStyles.positive}`}>
@@ -55,7 +59,7 @@ export default function TotalTape({ total, tapes, settings, dispatch, showDesele
     );
   });
 
-  const startingValue = total.startingValue || 0;
+  const startingValue = config.startingValue || 0;
   const totalNegative = grandTotal < 0;
 
   return (
@@ -89,7 +93,7 @@ export default function TotalTape({ total, tapes, settings, dispatch, showDesele
           </span>
         </div>
       </div>
-      {total.members.length === 0 && (
+      {config.members.length === 0 && (
         <div style={{ textAlign: 'center', padding: '0.5rem', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>
           tap tapes to include
         </div>

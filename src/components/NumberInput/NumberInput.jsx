@@ -4,6 +4,7 @@ import { AppStateSchema } from '../../schemas/tape.js';
 import { formatNumber, FORMAT_LABELS, FORMAT_ORDER } from '../../lib/format.js';
 import { loadSaves, getSave, addSave, deleteSave, loadAutosaves, getAutosave, addAutosave } from '../../lib/saves.js';
 import { generateId } from '../../../shared/ids.js';
+import { migrateState } from '../../../shared/defaults.js';
 import styles from './NumberInput.module.css';
 
 function relativeTime(ts) {
@@ -35,7 +36,7 @@ function downloadJSON(data, filename) {
   URL.revokeObjectURL(url);
 }
 
-export default function NumberInput({ dispatch, editingEntry, editingMode, onDoneEditing, onSelectEntry, subtotal, currentSubProduct, activeTapeId, activeTapeName, activeTapeColor, appState, activeTotal, viewingTotal, sync, onTotalConfigChange, configRequest, onConfigDone, onPreviewChange, onKeypadModeChange }) {
+export default function NumberInput({ dispatch, editingEntry, editingMode, onDoneEditing, onSelectEntry, subtotal, currentSubProduct, activeTapeId, activeTapeName, activeTapeColor, appState, activeTape, viewingTotal, sync, onTotalConfigChange, configRequest, onConfigDone, onPreviewChange, onKeypadModeChange, clearMode, setClearMode, clearModeTimer }) {
   const [input, setInput] = useState('');
   const [keypadMode, setKeypadMode] = useState('normal');
   const [freshEdit, setFreshEdit] = useState(false);
@@ -47,7 +48,6 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
   const colorRef = useRef(null);
   const colorIndexRef = useRef(null);
   const saveLongRef = useRef(null);
-  const shortcutLongRef = useRef(null);
   const activeShortcutRef = useRef(null); // { index, entryId } when editing a recalled shortcut
   const addedTotalRef = useRef(false);
   const isEditing = editingEntry !== null;
@@ -100,7 +100,7 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
 
   // Don't auto-open total config when selecting a total tape; reset when leaving
   useEffect(() => {
-    if (activeTotal) {
+    if (viewingTotal) {
       if (addedTotalRef.current) {
         addedTotalRef.current = false;
       } else {
@@ -113,16 +113,16 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
         setKeypadMode('normal');
       }
     }
-  }, [activeTotal?.id]);
+  }, [activeTape?.id, viewingTotal]);
 
   // Open config when a tape/total is added via TapeSwitcher
   useEffect(() => {
     if (!configRequest) return;
-    if (configRequest === 'tape') {
+    if (configRequest === 'tape' && !viewingTotal) {
       setInput(activeTapeName);
       setKeypadMode('tape');
-    } else if (configRequest === 'total' && activeTotal) {
-      setInput(activeTotal.name);
+    } else if (configRequest === 'total' && viewingTotal) {
+      setInput(activeTapeName);
       setKeypadMode('total');
     }
     onConfigDone();
@@ -248,26 +248,19 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
     onDoneEditing();
   }
 
-  // Long-press handler for C button
-  const clearRef = useRef(null);
-  function onClearDown() {
-    clearRef.current = setTimeout(() => {
-      clearRef.current = 'fired';
-      clear();
-      setKeypadMode('normal');
-    }, 600);
-  }
-  function onClearUp() {
-    if (clearRef.current === 'fired') {
-      clearRef.current = null;
-      return;
+  function handleClear() {
+    // Always clear input first
+    setFreshEdit(false);
+    if (isEditing) {
+      setInput('');
+      onDoneEditing();
+    } else {
+      setInput('');
     }
-    clearTimeout(clearRef.current);
-    clearRef.current = null;
-  }
-  function onClearCancel() {
-    clearTimeout(clearRef.current);
-    clearRef.current = null;
+    // Enter clear mode
+    setClearMode(true);
+    clearTimeout(clearModeTimer.current);
+    clearModeTimer.current = setTimeout(() => setClearMode(false), 1500);
   }
 
   function press(digit) {
@@ -285,17 +278,7 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
   }
 
   function clear() {
-    setFreshEdit(false);
-    if (isEditing) {
-      setInput('');
-      onDoneEditing();
-      return;
-    }
-    if (input) {
-      setInput('');
-    } else {
-      dispatch({ type: 'CLEAR_TAPE' });
-    }
+    handleClear();
   }
 
   function handleNew() {
@@ -313,10 +296,10 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
     if (viewingTotal) {
       const value = parseFloat(input);
       if (!isNaN(value) && input.trim() !== '') {
-        dispatch({ type: 'SET_TOTAL_STARTING_VALUE', totalId: activeTotal.id, value });
+        dispatch({ type: 'SET_TOTAL_STARTING_VALUE', value });
         setInput('');
       } else {
-        const startVal = activeTotal.startingValue || 0;
+        const startVal = activeTape.totalConfig?.startingValue || 0;
         setInput(startVal !== 0 ? String(startVal) : '');
       }
       return;
@@ -363,6 +346,7 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
     reader.onload = (ev) => {
       try {
         const data = JSON.parse(ev.target.result);
+        migrateState(data);
         const validated = v.parse(AppStateSchema, data);
         addAutosave(appState);
         dispatch({ type: 'LOAD_STATE', state: validated });
@@ -375,14 +359,8 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
   }
 
   function saveTapeName() {
-    if (viewingTotal && activeTotal) {
-      if (input && input !== activeTotal.name) {
-        dispatch({ type: 'RENAME_TOTAL', totalId: activeTotal.id, name: input });
-      }
-    } else {
-      if (input && input !== activeTapeName) {
-        dispatch({ type: 'RENAME_TAPE', tapeId: activeTapeId, name: input });
-      }
+    if (input && input !== activeTapeName) {
+      dispatch({ type: 'RENAME_TAPE', tapeId: activeTapeId, name: input });
     }
     setInput('');
   }
@@ -408,11 +386,7 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
     }
     clearTimeout(colorLongRef.current);
     colorLongRef.current = null;
-    if (viewingTotal && activeTotal) {
-      dispatch({ type: 'SET_TOTAL_COLOR', totalId: activeTotal.id, color: palette[index] });
-    } else {
-      dispatch({ type: 'SET_TAPE_COLOR', tapeId: activeTapeId, color: palette[index] });
-    }
+    dispatch({ type: 'SET_TAPE_COLOR', tapeId: activeTapeId, color: palette[index] });
   }
   function onColorCancel() {
     clearTimeout(colorLongRef.current);
@@ -425,23 +399,25 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
     const newPalette = [...palette];
     newPalette[idx] = newColor;
     dispatch({ type: 'SET_SETTING', key: 'palette', value: newPalette });
-    if (viewingTotal && activeTotal) {
-      dispatch({ type: 'SET_TOTAL_COLOR', totalId: activeTotal.id, color: newColor });
-    } else {
-      dispatch({ type: 'SET_TAPE_COLOR', tapeId: activeTapeId, color: newColor });
-    }
+    dispatch({ type: 'SET_TAPE_COLOR', tapeId: activeTapeId, color: newColor });
   }
 
   // Reset all long-press refs when page resumes from suspension (iOS Safari)
   useEffect(() => {
     function onVisibilityChange() {
       if (document.visibilityState === 'visible') {
-        for (const ref of [clearRef, saveLongRef, colorLongRef, shortcutLongRef]) {
+        for (const ref of [saveLongRef, colorLongRef]) {
           if (ref.current !== null) {
             if (ref.current !== 'fired') clearTimeout(ref.current);
             ref.current = null;
           }
         }
+        // Reset clear mode
+        if (clearModeTimer.current) {
+          clearTimeout(clearModeTimer.current);
+          clearModeTimer.current = null;
+        }
+        setClearMode(false);
       }
     }
     document.addEventListener('visibilitychange', onVisibilityChange);
@@ -498,46 +474,36 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
     activeShortcutRef.current = { index, entryId: newId };
   }
 
-  function onShortcutDown(index) {
-    if (!shortcutStores[index]) return;
-    shortcutLongRef.current = setTimeout(() => {
-      shortcutLongRef.current = 'fired';
+  function onShortcutTap(index) {
+    if (clearMode && shortcutStores[index]) {
+      // C+shortcut: delete the shortcut
       dispatch({ type: 'CLEAR_SHORTCUT_STORE', index });
-    }, 600);
-  }
-  function onShortcutUp(index) {
-    if (shortcutLongRef.current === 'fired') {
-      shortcutLongRef.current = null;
+      setClearMode(false);
+      clearTimeout(clearModeTimer.current);
       return;
     }
-    clearTimeout(shortcutLongRef.current);
-    shortcutLongRef.current = null;
     if (shortcutStores[index]) {
       shortcutRecall(index);
     } else {
       shortcutSave(index);
     }
   }
-  function onShortcutCancel() {
-    clearTimeout(shortcutLongRef.current);
-    shortcutLongRef.current = null;
-  }
 
   function renderKeypad() {
-    if (keypadMode === 'total' && activeTotal) {
-      const totalColor = activeTotal.color;
+    if (keypadMode === 'total' && viewingTotal) {
+      const totalColor = activeTapeColor;
       return (
         <div className={styles.grid}>
           <button className={styles.navBtn} onClick={() => { saveTapeName(); setKeypadMode('normal'); }}>BACK</button>
-          <button className={styles.fnBtn} onClick={() => dispatch({ type: 'MOVE_TOTAL_LEFT', totalId: activeTotal.id })}>&larr;</button>
-          <button className={styles.fnBtn} onClick={() => dispatch({ type: 'MOVE_TOTAL_RIGHT', totalId: activeTotal.id })}>&rarr;</button>
+          <button className={styles.fnBtn} onClick={() => dispatch({ type: 'MOVE_TAPE_LEFT', tapeId: activeTapeId })}>&larr;</button>
+          <button className={styles.fnBtn} onClick={() => dispatch({ type: 'MOVE_TAPE_RIGHT', tapeId: activeTapeId })}>&rarr;</button>
           <button className={styles.fnBtn} style={{ fontSize: '0.8rem' }} onClick={() => {
             const value = parseFloat(input);
             if (!isNaN(value) && input.trim() !== '') {
-              dispatch({ type: 'SET_TOTAL_STARTING_VALUE', totalId: activeTotal.id, value });
+              dispatch({ type: 'SET_TOTAL_STARTING_VALUE', value });
               setInput('');
             } else {
-              const startVal = activeTotal.startingValue || 0;
+              const startVal = activeTape.totalConfig?.startingValue || 0;
               setInput(startVal !== 0 ? String(startVal) : '');
             }
           }}>Start</button>
@@ -753,13 +719,8 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
           <button className={styles.navBtn} onClick={() => { setInput(''); setKeypadMode('normal'); }}>BACK</button>
           {empty}{empty}{empty}
           <button className={styles.wideBtn} onClick={() => {
-            if (viewingTotal && activeTotal) {
-              setInput(activeTotal.name);
-              setKeypadMode('total');
-            } else {
-              setInput(activeTapeName);
-              setKeypadMode('tape');
-            }
+            setInput(activeTapeName);
+            setKeypadMode(viewingTotal ? 'total' : 'tape');
           }}>{viewingTotal ? 'TOTAL' : 'TAPE'}</button>
           {empty}{empty}{empty}
           <button className={styles.wideBtn} onClick={() => setKeypadMode('setup')}>SETUP</button>
@@ -775,24 +736,18 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
     return (
       <div className={styles.keypadRow}>
         <div className={styles.sideColumn}>
-          <button className={styles.modeBtn} onClick={() => setKeypadMode('menu')}>MODE</button>
+          <button className={`${styles.clearBtn} ${clearMode ? styles.clearModeActive : ''}`} onClick={handleClear}>C</button>
           <button
             className={`${styles.quickSaveBtn} ${quickSaved ? styles.quickSaved : ''}`}
             onClick={quickSave}
-          >{quickSaved ? '\u2713' : '\u2193'}</button>
+          >{quickSaved ? '\u2713' : '\u25CF'}</button>
           <button className={styles.newBtn} onClick={handleNew}>NL</button>
-          <button
-            className={`${styles.clearBtn} ${styles.longPress}`}
-            onPointerDown={onClearDown}
-            onPointerUp={onClearUp}
-            onPointerCancel={onClearCancel}
-            onContextMenu={(e) => e.preventDefault()}
-          >C</button>
           {empty}
+          <button className={styles.modeBtn} onClick={() => setKeypadMode('menu')}>MODE</button>
         </div>
         <div className={styles.grid}>
-          <button className={styles.fnBtn} onClick={toggleSign}>&plusmn;</button>
           <button className={styles.fnBtn} onClick={backspace}>&larr;</button>
+          <button className={styles.fnBtn} onClick={toggleSign}>&plusmn;</button>
           <button className={styles.opBtn} onClick={opDisabled ? undefined : () => submit('/')} disabled={opDisabled}>&divide;</button>
           <button className={styles.opBtn} onClick={opDisabled ? undefined : () => submit('*')} disabled={opDisabled}>&times;</button>
 
@@ -838,7 +793,16 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
     <>
       <input type="file" accept=".json" ref={fileRef} onChange={handleImportFile} style={{ display: 'none' }} />
       <input type="color" ref={colorRef} onChange={onColorChange} style={{ display: 'none' }} />
-      <div className={styles.display}>
+      <div
+        className={`${styles.display} ${clearMode ? styles.clearModeDisplay : ''}`}
+        onClick={clearMode ? () => {
+          setInput('');
+          setFreshEdit(false);
+          if (isEditing) onDoneEditing();
+          setClearMode(false);
+          clearTimeout(clearModeTimer.current);
+        } : undefined}
+      >
         <span
           className={`${styles.subtotal} ${isEditing ? styles.subtotalClickable : ''}`}
           onClick={isEditing ? () => {
@@ -852,6 +816,7 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
           <input
             ref={textRef}
             type="text"
+            autoComplete="off"
             className={styles.textInput}
             value={input}
             onChange={(e) => setInput(keypadMode === 'room' ? e.target.value.toUpperCase() : e.target.value)}
@@ -880,15 +845,12 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
   );
 
   const shortcutSidebar = (
-    <div className={styles.shortcutSidebar}>
+    <div className={`${styles.shortcutSidebar} ${clearMode ? styles.clearModeShortcuts : ''}`}>
       {shortcutStores.map((slot, i) => (
         <button
           key={i}
-          className={`${slot ? `${styles.shortcutBtn} ${styles.longPress}` : styles.shortcutEmpty}`}
-          onPointerDown={() => onShortcutDown(i)}
-          onPointerUp={() => onShortcutUp(i)}
-          onPointerCancel={onShortcutCancel}
-          onContextMenu={(e) => e.preventDefault()}
+          className={`${slot ? styles.shortcutBtn : styles.shortcutEmpty} ${clearMode && slot ? styles.clearModeTarget : ''}`}
+          onClick={() => onShortcutTap(i)}
         >
           {shortcutPreview(slot)}
         </button>

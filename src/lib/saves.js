@@ -1,4 +1,5 @@
 import { generateId } from './ids.js';
+import { migrateState } from '../../shared/defaults.js';
 
 const SAVES_KEY = 'many-tapes-calculator-saves';
 const AUTOSAVES_KEY = 'many-tapes-calculator-autosaves';
@@ -22,7 +23,9 @@ export function loadSaves() {
 }
 
 export function getSave(id) {
-  return readAll().find((s) => s.id === id) || null;
+  const save = readAll().find((s) => s.id === id) || null;
+  if (save) migrateState(save.state);
+  return save;
 }
 
 export function addSave(name, state) {
@@ -72,5 +75,7 @@ export function loadAutosaves() {
 }
 
 export function getAutosave(id) {
-  return readAllAutosaves().find((s) => s.id === id) || null;
+  const save = readAllAutosaves().find((s) => s.id === id) || null;
+  if (save) migrateState(save.state);
+  return save;
 }

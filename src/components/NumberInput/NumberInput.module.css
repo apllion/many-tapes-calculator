@@ -147,6 +147,30 @@
   background: #b33;
 }
 
+.clearModeActive {
+  animation: clearPulse 0.75s ease-in-out infinite;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px #d44;
+}
+
+@keyframes clearPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.clearModeTarget {
+  border-color: #d44 !important;
+  opacity: 1 !important;
+}
+
+.clearModeShortcuts .shortcutBtn {
+  border-color: #d44;
+}
+
+.clearModeDisplay {
+  box-shadow: inset 0 0 0 2px #d44;
+  cursor: pointer;
+}
+
 .eqBtn {
   background: var(--color-positive);
   color: white;
@@ -164,7 +188,7 @@
 
 .quickSaveBtn {
   background: var(--color-border);
-  color: var(--color-text);
+  color: #d44;
   font-size: 0.85rem;
   display: flex;
   align-items: center;

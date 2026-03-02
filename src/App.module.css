@@ -32,6 +32,12 @@
   grid-row: 3;
 }
 
+.clearModeTape {
+  box-shadow: inset 0 0 0 2px #d44;
+  cursor: pointer;
+  overflow: hidden;
+}
+
 /* fullInput: no tape, no sidebar — just TapeSwitcher + fullPanel */
 .app.fullInput {
   grid-template-columns: 1fr;

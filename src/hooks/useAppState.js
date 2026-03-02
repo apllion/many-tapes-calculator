@@ -20,9 +20,5 @@ export function useAppState() {
     (a) => a.id === state.activeTapeId
   );
 
-  const activeTotal = state.activeTotalId
-    ? (state.totals || []).find((s) => s.id === state.activeTotalId) || null
-    : null;
-
-  return { state, dispatch, rawDispatch, activeTape, activeTotal };
+  return { state, dispatch, rawDispatch, activeTape };
 }
