@@ -1,5 +1,5 @@
 import { useRef, useEffect } from 'react';
-import { computeRunningTotals } from '../Tape/Tape.jsx';
+import { computeRunningTotals } from '../../../shared/calculate.js';
 import { formatNumber } from '../../lib/format.js';
 import styles from './TapeSwitcher.module.css';
 

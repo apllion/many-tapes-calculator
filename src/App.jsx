@@ -3,7 +3,8 @@ import { useAppState } from './hooks/useAppState.js';
 import { useSync } from './hooks/useSync.js';
 import { addAutosave } from './lib/saves.js';
 import TapeSwitcher from './components/TapeSwitcher/TapeSwitcher.jsx';
-import Tape, { computeRunningTotals } from './components/Tape/Tape.jsx';
+import Tape from './components/Tape/Tape.jsx';
+import { computeRunningTotals } from '../shared/calculate.js';
 import TotalTape from './components/TotalTape/TotalTape.jsx';
 import NumberInput from './components/NumberInput/NumberInput.jsx';
 import styles from './App.module.css';
@@ -13,6 +14,7 @@ export default function App() {
   const sync = useSync(state, rawDispatch);
   const d = sync.syncDispatch;
   const [editingId, setEditingId] = useState(null);
+  const [editingMode, setEditingMode] = useState(null); // null | 'text' | 'number'
   const [totalConfigOpen, setTotalConfigOpen] = useState(false);
   const [configRequest, setConfigRequest] = useState(null);
   const [previewEntry, setPreviewEntry] = useState(null);
@@ -37,11 +39,20 @@ export default function App() {
   // Clear editing when switching to total view
   if (viewingTotal && editingId) {
     setEditingId(null);
+    setEditingMode(null);
+  }
+
+  function handleSelect(id, mode) {
+    if (id === editingId && mode === editingMode) {
+      setEditingId(null);
+      setEditingMode(null);
+    } else {
+      setEditingId(id);
+      setEditingMode(mode);
+    }
   }
 
   const settings = state.settings || {};
-
-  const showTape = !['tape', 'setup', 'saves', 'loads', 'room', 'text'].includes(keypadMode);
 
   const editingEntry = editingId
     ? activeTape.tape.find((e) => e.id === editingId) ?? null
@@ -52,24 +63,8 @@ export default function App() {
   const subtotal = lastIndex >= 0 ? totals[lastIndex] : 0;
   const currentSubProduct = lastIndex >= 0 ? subProducts[lastIndex] : null;
 
-  // When editing a line, memory store operates from that line's position
-  const editingIndex = editingId
-    ? activeTape.tape.findIndex((e) => e.id === editingId)
-    : -1;
-  const storeSubtotal = editingIndex >= 0 ? totals[editingIndex] : subtotal;
-
-  // Scan upward from position (or tape end) to find last sub-product
-  const scanFrom = editingIndex >= 0 ? editingIndex : lastIndex;
-  let storeSubProduct = null;
-  for (let i = scanFrom; i >= 0; i--) {
-    if (subProducts[i] !== null) {
-      storeSubProduct = subProducts[i];
-      break;
-    }
-  }
-
   return (
-    <div className={`${styles.app} ${!showTape ? styles.fullInput : ''}`}>
+    <div className={styles.app}>
       <TapeSwitcher
         tapes={state.tapes}
         activeTapeId={state.activeTapeId}
@@ -80,26 +75,27 @@ export default function App() {
         onAddTape={() => { d({ type: 'ADD_TAPE' }); setConfigRequest('tape'); }}
         onAddTotal={() => { d({ type: 'ADD_TOTAL' }); setConfigRequest('total'); }}
       />
-      {showTape && (viewingTotal ? (
+      {viewingTotal ? (
         <TotalTape total={activeTotal} tapes={state.tapes} settings={settings} dispatch={d} showDeselected={totalConfigOpen} />
       ) : (
         <Tape
           tape={activeTape.tape}
           dispatch={d}
           editingId={editingId}
-          onSelect={setEditingId}
+          editingMode={editingMode}
+          onSelect={handleSelect}
           settings={settings}
           previewEntry={previewEntry}
         />
-      ))}
+      )}
       <NumberInput
         dispatch={d}
         editingEntry={editingEntry}
-        onDoneEditing={() => setEditingId(null)}
+        editingMode={editingMode}
+        onDoneEditing={() => { setEditingId(null); setEditingMode(null); }}
+        onSelectEntry={handleSelect}
         subtotal={subtotal}
         currentSubProduct={currentSubProduct}
-        storeSubtotal={storeSubtotal}
-        storeSubProduct={storeSubProduct}
         activeTapeId={state.activeTapeId}
         activeTapeName={activeTape.name}
         activeTapeColor={activeTape.color || null}
@@ -111,7 +107,6 @@ export default function App() {
         configRequest={configRequest}
         onConfigDone={() => setConfigRequest(null)}
         onPreviewChange={setPreviewEntry}
-        fullMode={!showTape}
         onKeypadModeChange={setKeypadMode}
       />
     </div>
