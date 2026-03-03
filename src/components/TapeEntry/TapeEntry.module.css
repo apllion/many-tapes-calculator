@@ -231,3 +231,8 @@
 .clearTarget {
   box-shadow: inset 0 0 0 2px var(--color-danger, #e74c3c);
 }
+
+.clearZone {
+  box-shadow: inset 0 0 0 2px var(--color-danger, #e74c3c);
+  border-radius: 3px;
+}

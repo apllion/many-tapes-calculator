@@ -6,7 +6,7 @@ import styles from './Tape.module.css';
 
 export { computeRunningTotals };
 
-export default function Tape({ tape, editingId, editingMode, onSelect, settings, previewEntry, editingInput, clearMode, onClearEntry }) {
+export default function Tape({ tape, editingId, editingMode, onSelect, settings, previewEntry, editingInput, clearMode, clearHighlight, onClearEntry }) {
   const bottomRef = useRef(null);
   const opPosition = settings?.operatorPosition;
   const { totals, subProducts } = computeRunningTotals(tape, settings?.calculationMode, opPosition);
@@ -98,6 +98,7 @@ export default function Tape({ tape, editingId, editingMode, onSelect, settings,
                 settings={settings}
                 editingInput={entry.id === editingId ? editingInput : null}
                 clearMode={clearMode}
+                clearHighlight={entry.id === editingId ? clearHighlight : null}
                 isPrefix={opPosition === 'prefix'}
               />
               {i === insertAfterIndex && renderPreview()}

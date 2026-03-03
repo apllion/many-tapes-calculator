@@ -3,7 +3,7 @@ import styles from './TapeEntry.module.css';
 
 const OP_SYMBOLS = { '+': '+', '-': '\u2212', '*': '\u00d7', '/': '\u00f7' };
 
-export default function TapeEntry({ entry, resolvedText, runningTotal, subProduct, isSelected, editingMode, onSelect, settings, editingInput, clearMode, isPrefix }) {
+export default function TapeEntry({ entry, resolvedText, runningTotal, subProduct, isSelected, editingMode, onSelect, settings, editingInput, clearMode, clearHighlight, isPrefix }) {
   const fmt = settings?.numberFormat;
   const displayValue = subProduct !== null ? subProduct : runningTotal;
   const isNegative = displayValue < 0;
@@ -51,7 +51,7 @@ export default function TapeEntry({ entry, resolvedText, runningTotal, subProduc
       className={`${styles.row} ${colorNeg ? styles.negRow : ''} ${isSelected ? styles.selected : ''} ${clearMode ? styles.clearTarget : ''}`}
     >
       <div
-        className={`${styles.textZone} ${isSelected && editingMode === 'text' ? styles.activeZone : ''}`}
+        className={`${styles.textZone} ${isSelected && editingMode === 'text' ? styles.activeZone : ''} ${clearHighlight === 'text' ? styles.clearZone : ''}`}
         onClick={() => onSelect(entry.id, 'text')}
       >
         {displayText ? (
@@ -62,7 +62,7 @@ export default function TapeEntry({ entry, resolvedText, runningTotal, subProduc
       </div>
 
       <div
-        className={`${styles.numberZone} ${isSelected && editingMode === 'number' ? styles.activeZone : ''}`}
+        className={`${styles.numberZone} ${isSelected && editingMode === 'number' ? styles.activeZone : ''} ${clearHighlight === 'number' ? styles.clearZone : ''}`}
         onClick={() => onSelect(entry.id, 'number')}
       >
         {shownValue !== null ? (

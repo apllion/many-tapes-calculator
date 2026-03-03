@@ -36,7 +36,7 @@ function downloadJSON(data, filename) {
   URL.revokeObjectURL(url);
 }
 
-export default function NumberInput({ dispatch, editingEntry, editingMode, onDoneEditing, onSelectEntry, subtotal, currentSubProduct, activeTapeId, activeTapeName, activeTapeColor, appState, activeTape, viewingTotal, sync, onTotalConfigChange, configRequest, onConfigDone, onPreviewChange, onEditingInputChange, onKeypadModeChange, clearMode, setClearMode, clearModeTimer }) {
+export default function NumberInput({ dispatch, editingEntry, editingMode, onDoneEditing, onSelectEntry, subtotal, currentSubProduct, activeTapeId, activeTapeName, activeTapeColor, appState, activeTape, viewingTotal, sync, onTotalConfigChange, configRequest, onConfigDone, onPreviewChange, onEditingInputChange, onKeypadModeChange, clearMode, setClearMode, clearModeTimer, setClearHighlight, clearHighlightTimer }) {
   const [input, setInput] = useState('');
   const [pendingOp, setPendingOp] = useState(null);
   const [keypadMode, setKeypadMode] = useState('normal');
@@ -316,20 +316,33 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
     onDoneEditing();
   }
 
+  function flashHighlight(zone) {
+    setClearHighlight(zone);
+    clearTimeout(clearHighlightTimer.current);
+    clearHighlightTimer.current = setTimeout(() => setClearHighlight(null), 600);
+  }
+
   function handleClear() {
     setFreshEdit(false);
-    if (input) {
-      // First C press: clear input only
-      setInput('');
-      setPendingOp(null);
-      return;
+    if (isEditing) {
+      if (input) {
+        // Clear number input, flash number zone
+        setInput('');
+        setPendingOp(null);
+        flashHighlight('number');
+        return;
+      }
+      if (editingEntry.text) {
+        // Clear text label, flash text zone
+        dispatch({ type: 'UPDATE_ENTRY', entryId: editingEntry.id, updates: { text: undefined } });
+        flashHighlight('text');
+        return;
+      }
+      // Nothing left to clear — deselect
+      onSelectEntry(editingEntry.id, null);
     }
     setInput('');
     setPendingOp(null);
-    if (isEditing) {
-      // Go back to "selected" state (keep editingId, clear editingMode)
-      onSelectEntry(editingEntry.id, null);
-    }
     // Enter clear mode
     setClearMode(true);
     clearTimeout(clearModeTimer.current);
@@ -487,12 +500,17 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
             ref.current = null;
           }
         }
-        // Reset clear mode
+        // Reset clear mode and highlight
         if (clearModeTimer.current) {
           clearTimeout(clearModeTimer.current);
           clearModeTimer.current = null;
         }
+        if (clearHighlightTimer.current) {
+          clearTimeout(clearHighlightTimer.current);
+          clearHighlightTimer.current = null;
+        }
         setClearMode(false);
+        setClearHighlight(null);
       }
     }
     document.addEventListener('visibilitychange', onVisibilityChange);

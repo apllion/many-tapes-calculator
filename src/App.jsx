@@ -21,7 +21,9 @@ export default function App() {
   const [editingInput, setEditingInput] = useState(null);
   const [keypadMode, setKeypadMode] = useState('normal');
   const [clearMode, setClearMode] = useState(false);
+  const [clearHighlight, setClearHighlight] = useState(null); // null | 'number' | 'text'
   const clearModeTimer = useRef(null);
+  const clearHighlightTimer = useRef(null);
 
   const viewingTotal = !!activeTape.totalConfig;
   // Autosave every 5 minutes, skip if nothing changed
@@ -94,6 +96,7 @@ export default function App() {
           previewEntry={previewEntry}
           editingInput={editingInput}
           clearMode={clearMode}
+          clearHighlight={clearHighlight}
           onClearEntry={(entryId) => {
             d({ type: 'DELETE_ENTRY', entryId });
             setClearMode(false);
@@ -125,6 +128,8 @@ export default function App() {
         clearMode={clearMode}
         setClearMode={setClearMode}
         clearModeTimer={clearModeTimer}
+        setClearHighlight={setClearHighlight}
+        clearHighlightTimer={clearHighlightTimer}
       />
     </div>
   );
