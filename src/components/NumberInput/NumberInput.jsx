@@ -38,6 +38,7 @@ function downloadJSON(data, filename) {
 
 export default function NumberInput({ dispatch, editingEntry, editingMode, onDoneEditing, onSelectEntry, subtotal, currentSubProduct, activeTapeId, activeTapeName, activeTapeColor, appState, activeTape, viewingTotal, sync, onTotalConfigChange, configRequest, onConfigDone, onPreviewChange, onEditingInputChange, onKeypadModeChange, clearMode, setClearMode, clearModeTimer }) {
   const [input, setInput] = useState('');
+  const [pendingOp, setPendingOp] = useState(null);
   const [keypadMode, setKeypadMode] = useState('normal');
   const [freshEdit, setFreshEdit] = useState(false);
   const [quickSaved, setQuickSaved] = useState(false);
@@ -53,6 +54,7 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
   const savedTapeRef = useRef(null); // original tape entries while editing shortcuts
   const addedTotalRef = useRef(false);
   const isEditing = editingEntry !== null && editingMode !== null;
+  const isPrefix = appState.settings?.operatorPosition === 'prefix';
 
   // Tick every 10s while connecting to update wait status text
   useEffect(() => {
@@ -156,12 +158,16 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
     if (input && keypadMode === 'normal') {
       const value = parseFloat(input);
       if (!isNaN(value)) {
-        onPreviewChange({ op: '+', value });
+        onPreviewChange({ op: isPrefix ? (pendingOp || '+') : '+', value });
         return;
       }
     }
+    if (isPrefix && pendingOp && !input && keypadMode === 'normal') {
+      onPreviewChange(null);
+      return;
+    }
     onPreviewChange(null);
-  }, [input, keypadMode, isEditing, viewingTotal]);
+  }, [input, keypadMode, isEditing, viewingTotal, pendingOp, isPrefix]);
 
   // Send live editing input to tape for instant preview
   useEffect(() => {
@@ -231,7 +237,13 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
         activeShortcutRef.current = null;
       }
       setInput('');
+      if (isPrefix) setPendingOp(op !== '=' ? op : null);
       onDoneEditing();
+      return;
+    }
+
+    if (isPrefix) {
+      submitPrefix(op);
       return;
     }
 
@@ -271,6 +283,40 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
     setInput('');
   }
 
+  function submitPrefix(op) {
+    const value = parseFloat(input);
+    const hasInput = !isNaN(value) && input.trim() !== '';
+
+    if (op === '=') {
+      if (hasInput) {
+        dispatch({ type: 'ADD_ENTRY_AND_TOTAL', op: pendingOp || '+', value });
+        setInput('');
+        setPendingOp(null);
+      } else {
+        // Empty = logic: subtotal / upgrade to T
+        const tape = appState.tapes.find((a) => a.id === activeTapeId)?.tape || [];
+        const lastEntry = tape[tape.length - 1];
+        if (lastEntry && lastEntry.op === '=') {
+          dispatch({ type: 'UPDATE_ENTRY', entryId: lastEntry.id, updates: { op: 'T' } });
+        } else if (lastEntry && lastEntry.op !== 'T') {
+          dispatch({ type: 'ADD_ENTRY', op: '=', value: 0 });
+        }
+        setPendingOp(null);
+      }
+      return;
+    }
+
+    if (hasInput) {
+      // Has input: commit entry with pendingOp, stage new op
+      dispatch({ type: 'ADD_ENTRY', op: pendingOp || '+', value });
+      setInput('');
+      setPendingOp(op);
+    } else {
+      // No input: set/change pending operator
+      setPendingOp(op);
+    }
+  }
+
   function confirmText() {
     if (!isEditing) return;
     const updates = input ? { text: input } : { text: undefined };
@@ -282,6 +328,7 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
   function handleClear() {
     setFreshEdit(false);
     setInput('');
+    setPendingOp(null);
     if (isEditing) {
       // Go back to "selected" state (keep editingId, clear editingMode)
       onSelectEntry(editingEntry.id, null);
@@ -312,12 +359,14 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
 
   function handleNew() {
     const newId = generateId();
+    const newOp = isPrefix ? (pendingOp || '+') : '+';
     if (isEditing) {
-      dispatch({ type: 'INSERT_ENTRY', afterId: editingEntry.id, entryId: newId, op: '+', value: null });
+      dispatch({ type: 'INSERT_ENTRY', afterId: editingEntry.id, entryId: newId, op: newOp, value: null });
     } else {
-      dispatch({ type: 'ADD_ENTRY', entryId: newId, op: '+', value: null });
+      dispatch({ type: 'ADD_ENTRY', entryId: newId, op: newOp, value: null });
     }
     setInput('');
+    if (isPrefix) setPendingOp(null);
     onSelectEntry(newId, 'number');
   }
 
@@ -780,6 +829,7 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
       const currentFmt = appState.settings?.numberFormat || '2dec';
       const colorNeg = appState.settings?.colorNegatives || false;
       const calcMode = appState.settings?.calculationMode || 'arithmetic';
+      const opPos = appState.settings?.operatorPosition || 'postfix';
       return (
         <div className={styles.grid}>
           <button className={styles.navBtn} onClick={() => { setInput(''); setKeypadMode('normal'); }}>BACK</button>
@@ -808,6 +858,13 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
             onClick={() => dispatch({ type: 'SET_SETTING', key: 'calculationMode', value: calcMode === 'adding' ? 'arithmetic' : 'adding' })}
           >
             {calcMode === 'adding' ? 'Adding Machine' : 'Arithmetic'}
+          </button>
+          <button
+            className={`${styles.wideBtn} ${opPos === 'prefix' ? styles.toggleOn : ''}`}
+            style={{ gridColumn: 'span 2' }}
+            onClick={() => dispatch({ type: 'TOGGLE_OPERATOR_POSITION' })}
+          >
+            {opPos === 'prefix' ? 'Prefix' : 'Postfix'}
           </button>
           <button className={styles.wideBtn} style={{ gridColumn: 'span 2' }} onClick={exportAll}>Export</button>
           <button className={styles.wideBtn} style={{ gridColumn: 'span 2' }} onClick={importData}>Import</button>
@@ -957,7 +1014,7 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
             placeholder={editingMode === 'text' ? 'Type text\u2026' : keypadMode === 'room' ? 'Room code\u2026' : keypadMode === 'saves' ? 'Save name\u2026' : viewingTotal ? 'Total name\u2026' : 'Tape name\u2026'}
           />
         ) : (
-          <span>{input || '0'}</span>
+          <span>{isPrefix && pendingOp ? (OP_SYMBOLS[pendingOp] || pendingOp) + ' ' : ''}{input || '0'}</span>
         )}
       </div>
     </>

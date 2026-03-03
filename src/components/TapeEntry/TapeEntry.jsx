@@ -3,7 +3,7 @@ import styles from './TapeEntry.module.css';
 
 const OP_SYMBOLS = { '+': '+', '-': '\u2212', '*': '\u00d7', '/': '\u00f7' };
 
-export default function TapeEntry({ entry, resolvedText, runningTotal, subProduct, isSelected, editingMode, onSelect, settings, editingInput, clearMode }) {
+export default function TapeEntry({ entry, resolvedText, runningTotal, subProduct, isSelected, editingMode, onSelect, settings, editingInput, clearMode, isPrefix }) {
   const fmt = settings?.numberFormat;
   const displayValue = subProduct !== null ? subProduct : runningTotal;
   const isNegative = displayValue < 0;
@@ -67,12 +67,19 @@ export default function TapeEntry({ entry, resolvedText, runningTotal, subProduc
       >
         {shownValue !== null ? (
           <>
+            {isPrefix && (
+              <span className={styles.op}>
+                {OP_SYMBOLS[entry.op]}
+              </span>
+            )}
             <span className={styles.value}>
               {formatNumber(shownValue, fmt)}
             </span>
-            <span className={styles.op}>
-              {OP_SYMBOLS[entry.op]}
-            </span>
+            {!isPrefix && (
+              <span className={styles.op}>
+                {OP_SYMBOLS[entry.op]}
+              </span>
+            )}
             <span className={`${totalClass} ${subProduct !== null ? styles.hasSubProduct : ''}`}>
               {formatNumber(runningTotal, fmt)}
               {subProduct !== null && (

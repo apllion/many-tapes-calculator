@@ -8,7 +8,8 @@ export { computeRunningTotals };
 
 export default function Tape({ tape, editingId, editingMode, onSelect, settings, previewEntry, editingInput, clearMode, onClearEntry }) {
   const bottomRef = useRef(null);
-  const { totals, subProducts } = computeRunningTotals(tape, settings?.calculationMode);
+  const opPosition = settings?.operatorPosition;
+  const { totals, subProducts } = computeRunningTotals(tape, settings?.calculationMode, opPosition);
 
   // Compute # numbering for entries with text (text-only and labeled numeric)
   const textCounts = {};
@@ -28,7 +29,7 @@ export default function Tape({ tape, editingId, editingMode, onSelect, settings,
   let previewTotal = null;
   if (previewEntry && previewEntry.op !== 'text') {
     const tempTape = [...tape.slice(0, insertAfterIndex + 1), previewEntry];
-    const { totals: tempTotals } = computeRunningTotals(tempTape, settings?.calculationMode);
+    const { totals: tempTotals } = computeRunningTotals(tempTape, settings?.calculationMode, opPosition);
     previewTotal = tempTotals[tempTotals.length - 1];
   }
 
@@ -97,6 +98,7 @@ export default function Tape({ tape, editingId, editingMode, onSelect, settings,
                 settings={settings}
                 editingInput={entry.id === editingId ? editingInput : null}
                 clearMode={clearMode}
+                isPrefix={opPosition === 'prefix'}
               />
               {i === insertAfterIndex && renderPreview()}
             </Fragment>

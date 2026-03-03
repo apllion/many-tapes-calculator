@@ -38,6 +38,7 @@ export const SettingsSchema = v.object({
   colorNegatives: v.optional(v.boolean(), false),
   palette: v.optional(v.array(v.string())),
   calculationMode: v.optional(v.picklist(['arithmetic', 'adding']), 'arithmetic'),
+  operatorPosition: v.optional(v.picklist(['postfix', 'prefix']), 'postfix'),
   textStores: v.optional(v.array(v.nullable(v.string())), []),
   shortcutStores: v.optional(v.array(v.nullable(ShortcutStoreSchema)), []),
 });

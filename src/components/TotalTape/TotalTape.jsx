@@ -25,7 +25,7 @@ export default function TotalTape({ tape, tapes, settings, dispatch, showDeselec
     const sign = memberMap[t.id] || null;
     const isMember = sign !== null;
     if (!isMember && !showDeselected) return null;
-    const { totals } = computeRunningTotals(t.tape, settings?.calculationMode);
+    const { totals } = computeRunningTotals(t.tape, settings?.calculationMode, settings?.operatorPosition);
     const subtotal = totals.length > 0 ? totals[totals.length - 1] : 0;
     const signedValue = sign === '-' ? -subtotal : subtotal;
     if (isMember) grandTotal += signedValue;

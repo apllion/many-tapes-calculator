@@ -5,6 +5,7 @@ import styles from './TapeSwitcher.module.css';
 export default function TapeSwitcher({ tapes, activeTapeId, dispatch, settings, onAddTape, onAddTotal, clearMode, onClearTape }) {
   const fmt = settings?.numberFormat;
   const calcMode = settings?.calculationMode;
+  const opPosition = settings?.operatorPosition;
 
   function computeTotalValue(tape) {
     if (!tape.totalConfig) return null;
@@ -15,7 +16,7 @@ export default function TapeSwitcher({ tapes, activeTapeId, dispatch, settings, 
       if (t.id === tape.id) return; // exclude self
       const sign = memberMap[t.id];
       if (sign) {
-        const { totals: rt } = computeRunningTotals(t.tape, calcMode);
+        const { totals: rt } = computeRunningTotals(t.tape, calcMode, opPosition);
         const sub = rt.length > 0 ? rt[rt.length - 1] : 0;
         grandTotal += sign === '-' ? -sub : sub;
       }
@@ -30,7 +31,7 @@ export default function TapeSwitcher({ tapes, activeTapeId, dispatch, settings, 
           const isTotal = !!tape.totalConfig;
           const displayValue = isTotal
             ? computeTotalValue(tape)
-            : (() => { const { totals: rt } = computeRunningTotals(tape.tape, calcMode); return rt.length > 0 ? rt[rt.length - 1] : 0; })();
+            : (() => { const { totals: rt } = computeRunningTotals(tape.tape, calcMode, opPosition); return rt.length > 0 ? rt[rt.length - 1] : 0; })();
           return (
           <button
             key={tape.id}

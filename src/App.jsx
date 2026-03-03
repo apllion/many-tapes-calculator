@@ -61,7 +61,7 @@ export default function App() {
     ? activeTape.tape.find((e) => e.id === editingId) ?? null
     : null;
 
-  const { totals, subProducts } = computeRunningTotals(activeTape.tape, settings.calculationMode);
+  const { totals, subProducts } = computeRunningTotals(activeTape.tape, settings.calculationMode, settings.operatorPosition);
   const lastIndex = totals.length - 1;
   const subtotal = lastIndex >= 0 ? totals[lastIndex] : 0;
   const currentSubProduct = lastIndex >= 0 ? subProducts[lastIndex] : null;

@@ -9,6 +9,41 @@ export function mapTape(state, tapeId, fn) {
   };
 }
 
+function shiftTapeOps(entries, fromPosition) {
+  const result = entries.map((e) => ({ ...e }));
+  let segStart = 0;
+  for (let i = 0; i <= result.length; i++) {
+    if (i === result.length || result[i].op === 'T') {
+      // Transform ops within this segment
+      const indices = [];
+      for (let j = segStart; j < i; j++) {
+        const e = result[j];
+        if (e.value != null && (e.op === '+' || e.op === '-' || e.op === '*' || e.op === '/')) {
+          indices.push(j);
+        }
+      }
+      if (indices.length > 0) {
+        const oldOps = indices.map((idx) => result[idx].op);
+        if (fromPosition === 'postfix') {
+          // postfix→prefix: first gets +, each subsequent gets previous row's old op
+          result[indices[0]].op = '+';
+          for (let j = 1; j < indices.length; j++) {
+            result[indices[j]].op = oldOps[j - 1];
+          }
+        } else {
+          // prefix→postfix: each gets next row's old op, last gets +
+          for (let j = 0; j < indices.length - 1; j++) {
+            result[indices[j]].op = oldOps[j + 1];
+          }
+          result[indices[indices.length - 1]].op = '+';
+        }
+      }
+      segStart = i + 1;
+    }
+  }
+  return result;
+}
+
 // Actions that affect shared state (tapes, settings)
 export function sharedReducer(state, action) {
   switch (action.type) {
@@ -32,7 +67,7 @@ export function sharedReducer(state, action) {
         ...a,
         tape: [
           ...a.tape,
-          { id: action.entryId, op: '+', value: action.value, ...(action.text !== undefined && { text: action.text }), timestamp: Date.now() },
+          { id: action.entryId, op: action.op || '+', value: action.value, ...(action.text !== undefined && { text: action.text }), timestamp: Date.now() },
           { id: action.totalEntryId, op: action.totalOp || '=', value: 0, timestamp: Date.now() },
         ],
       }));
@@ -179,6 +214,19 @@ export function sharedReducer(state, action) {
 
     case 'SET_SETTING':
       return { ...state, settings: { ...state.settings, [action.key]: action.value } };
+
+    case 'TOGGLE_OPERATOR_POSITION': {
+      const currentPos = state.settings?.operatorPosition || 'postfix';
+      const newPos = currentPos === 'postfix' ? 'prefix' : 'postfix';
+      return {
+        ...state,
+        tapes: state.tapes.map((tape) => ({
+          ...tape,
+          tape: shiftTapeOps(tape.tape, currentPos),
+        })),
+        settings: { ...state.settings, operatorPosition: newPos },
+      };
+    }
 
     case 'SET_TEXT_STORE': {
       const stores = [...(state.settings?.textStores || [])];
