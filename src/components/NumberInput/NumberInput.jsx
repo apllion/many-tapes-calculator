@@ -287,31 +287,12 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
     const value = parseFloat(input);
     const hasInput = !isNaN(value) && input.trim() !== '';
 
-    if (op === '=') {
-      if (hasInput) {
-        dispatch({ type: 'ADD_ENTRY_AND_TOTAL', op: pendingOp || '+', value });
-        setInput('');
-        setPendingOp(null);
-      } else {
-        // Empty = logic: subtotal / upgrade to T
-        const tape = appState.tapes.find((a) => a.id === activeTapeId)?.tape || [];
-        const lastEntry = tape[tape.length - 1];
-        if (lastEntry && lastEntry.op === '=') {
-          dispatch({ type: 'UPDATE_ENTRY', entryId: lastEntry.id, updates: { op: 'T' } });
-        } else if (lastEntry && lastEntry.op !== 'T') {
-          dispatch({ type: 'ADD_ENTRY', op: '=', value: 0 });
-        }
-        setPendingOp(null);
-      }
-      return;
-    }
-
     if (hasInput) {
-      // Has input: commit entry with pendingOp, stage new op
+      // Commit entry with pendingOp, stage new op (= clears pendingOp)
       dispatch({ type: 'ADD_ENTRY', op: pendingOp || '+', value });
       setInput('');
-      setPendingOp(op);
-    } else {
+      setPendingOp(op !== '=' ? op : null);
+    } else if (op !== '=') {
       // No input: set/change pending operator
       setPendingOp(op);
     }
