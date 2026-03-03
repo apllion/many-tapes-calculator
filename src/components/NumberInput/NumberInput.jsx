@@ -219,7 +219,7 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
       if (!isNaN(value) && (value !== 0 || editingEntry.value === null)) {
         updates.value = value;
       }
-      if (op !== '=') {
+      if (op !== '=' && !isPrefix) {
         updates.op = op;
       }
       if (Object.keys(updates).length > 0) {
@@ -524,13 +524,13 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
     const hasText = !!slot.text;
     const hasValue = slot.value != null;
     if (!hasText && !hasValue) return null;
+    const opLabel = slot.op && slot.op !== '+' ? OP_SYMBOLS[slot.op] || slot.op : '';
     return (
       <>
         {hasText && <span className={styles.shortcutText}>{slot.text}</span>}
         {hasValue && (
           <span className={styles.shortcutValue}>
-            {String(slot.value)}
-            {slot.op && slot.op !== '+' ? OP_SYMBOLS[slot.op] || slot.op : ''}
+            {isPrefix ? opLabel + String(slot.value) : String(slot.value) + opLabel}
           </span>
         )}
       </>
@@ -568,9 +568,10 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
     const stored = shortcutStores[index];
     if (!stored) return;
     const newId = generateId();
+    const recallOp = isPrefix && pendingOp ? pendingOp : (stored.op || '+');
     const entry = {
       entryId: newId,
-      op: stored.op || '+',
+      op: recallOp,
       value: stored.value ?? null,
       ...(stored.text ? { text: stored.text } : {}),
     };
@@ -580,6 +581,7 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
       dispatch({ type: 'ADD_ENTRY', ...entry });
     }
     setInput(stored.value != null ? String(stored.value) : '');
+    if (isPrefix) setPendingOp(null);
     onSelectEntry(newId, 'number');
     activeShortcutRef.current = { index, entryId: newId };
   }
