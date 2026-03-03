@@ -933,6 +933,12 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
             className={styles.textInput}
             value={input}
             onChange={(e) => setInput(keypadMode === 'room' ? e.target.value.toUpperCase() : e.target.value)}
+            onBlur={() => {
+              if (editingMode === 'text' && editingEntry) {
+                const updates = input ? { text: input } : { text: undefined };
+                dispatch({ type: 'UPDATE_ENTRY', entryId: editingEntry.id, updates });
+              }
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 if (editingMode === 'text') { confirmText(); }
@@ -957,12 +963,16 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
     </>
   );
 
+  const tapeColorByName = {};
+  for (const t of appState.tapes) { if (t.color) tapeColorByName[t.name] = t.color; }
+
   const shortcutSidebar = (
     <div className={`${styles.shortcutSidebar} ${clearMode ? styles.clearModeShortcuts : ''}`}>
       {shortcutStores.map((slot, i) => (
         <button
           key={i}
           className={`${slot ? styles.shortcutBtn : styles.shortcutEmpty} ${clearMode && slot ? styles.clearModeTarget : ''}`}
+          style={slot?.text && tapeColorByName[slot.text] ? { background: tapeColorByName[slot.text] + '30', color: tapeColorByName[slot.text], borderColor: tapeColorByName[slot.text] } : undefined}
           onClick={() => onShortcutTap(i)}
         >
           {shortcutPreview(slot)}

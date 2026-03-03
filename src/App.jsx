@@ -87,7 +87,6 @@ export default function App() {
       ) : (
         <Tape
           tape={activeTape.tape}
-          dispatch={d}
           editingId={editingId}
           editingMode={editingMode}
           onSelect={handleSelect}
@@ -97,12 +96,6 @@ export default function App() {
           clearMode={clearMode}
           onClearEntry={(entryId) => {
             d({ type: 'DELETE_ENTRY', entryId });
-            setClearMode(false);
-            clearTimeout(clearModeTimer.current);
-          }}
-          onClearField={(entryId, field) => {
-            const updates = field === 'text' ? { text: undefined } : { value: null };
-            d({ type: 'UPDATE_ENTRY', entryId, updates });
             setClearMode(false);
             clearTimeout(clearModeTimer.current);
           }}

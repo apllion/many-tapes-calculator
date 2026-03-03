@@ -6,7 +6,7 @@ import styles from './Tape.module.css';
 
 export { computeRunningTotals };
 
-export default function Tape({ tape, dispatch, editingId, editingMode, onSelect, settings, previewEntry, editingInput, clearMode, onClearEntry, onClearField }) {
+export default function Tape({ tape, editingId, editingMode, onSelect, settings, previewEntry, editingInput, clearMode, onClearEntry }) {
   const bottomRef = useRef(null);
   const { totals, subProducts } = computeRunningTotals(tape, settings?.calculationMode);
 
@@ -40,23 +40,10 @@ export default function Tape({ tape, dispatch, editingId, editingMode, onSelect,
 
   function handleEntryTap(id, mode) {
     if (clearMode) {
-      if (id === editingId) {
-        onClearField(id, mode);
-      } else {
-        onClearEntry(id);
-      }
+      onClearEntry(id);
       return;
     }
-    if (id !== editingId) {
-      // First tap: select only (editingMode = null)
-      onSelect(id, null);
-    } else if (editingMode === null) {
-      // Second tap: enter edit mode
-      onSelect(id, mode);
-    } else {
-      // Already editing: toggle/switch via original handler
-      onSelect(id, mode);
-    }
+    onSelect(id, mode);
   }
 
   function renderPreview() {
@@ -90,13 +77,13 @@ export default function Tape({ tape, dispatch, editingId, editingMode, onSelect,
   }
 
   return (
-    <div className={styles.container}>
+    <div className={styles.container} onClick={(e) => { if (e.target === e.currentTarget && editingId) onSelect(editingId, editingMode); }}>
       {tape.length === 0 && !previewEntry ? (
         <div className={styles.empty}>
           Enter a number below to start
         </div>
       ) : (
-        <div className={styles.entries}>
+        <div className={styles.entries} onClick={(e) => { if (e.target === e.currentTarget && editingId) onSelect(editingId, editingMode); }}>
           {tape.map((entry, i) => (
             <Fragment key={entry.id}>
               <TapeEntry
@@ -104,13 +91,12 @@ export default function Tape({ tape, dispatch, editingId, editingMode, onSelect,
                 resolvedText={resolvedTexts[i]}
                 runningTotal={totals[i]}
                 subProduct={subProducts[i]}
-                dispatch={dispatch}
                 isSelected={entry.id === editingId}
                 editingMode={entry.id === editingId ? editingMode : null}
                 onSelect={handleEntryTap}
                 settings={settings}
                 editingInput={entry.id === editingId ? editingInput : null}
-                clearMode={clearMode && entry.id === editingId}
+                clearMode={clearMode}
               />
               {i === insertAfterIndex && renderPreview()}
             </Fragment>

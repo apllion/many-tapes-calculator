@@ -3,7 +3,7 @@ import styles from './TapeEntry.module.css';
 
 const OP_SYMBOLS = { '+': '+', '-': '\u2212', '*': '\u00d7', '/': '\u00f7' };
 
-export default function TapeEntry({ entry, resolvedText, runningTotal, subProduct, dispatch, isSelected, editingMode, onSelect, settings, editingInput, clearMode }) {
+export default function TapeEntry({ entry, resolvedText, runningTotal, subProduct, isSelected, editingMode, onSelect, settings, editingInput, clearMode }) {
   const fmt = settings?.numberFormat;
   const displayValue = subProduct !== null ? subProduct : runningTotal;
   const isNegative = displayValue < 0;
@@ -17,16 +17,6 @@ export default function TapeEntry({ entry, resolvedText, runningTotal, subProduc
         className={`${styles.row} ${styles.textRow} ${isSelected ? styles.selected : ''} ${clearMode ? styles.clearTarget : ''}`}
         onClick={() => onSelect(entry.id, 'text')}
       >
-        <button
-          className={styles.deleteBtn}
-          onClick={(e) => {
-            e.stopPropagation();
-            dispatch({ type: 'DELETE_ENTRY', entryId: entry.id });
-          }}
-          aria-label="Delete entry"
-        >
-          &times;
-        </button>
         <span className={styles.textContent}>
           {resolvedText || entry.text}
         </span>
@@ -41,16 +31,6 @@ export default function TapeEntry({ entry, resolvedText, runningTotal, subProduc
         className={`${styles.row} ${isTotal ? styles.totalRow : styles.subtotalRow} ${isSelected ? styles.selected : ''} ${clearMode ? styles.clearTarget : ''}`}
         onClick={() => onSelect(entry.id, 'number')}
       >
-        <button
-          className={styles.deleteBtn}
-          onClick={(e) => {
-            e.stopPropagation();
-            dispatch({ type: 'DELETE_ENTRY', entryId: entry.id });
-          }}
-          aria-label="Delete entry"
-        >
-          &times;
-        </button>
         <span className={styles.eqLabel}>{isTotal ? 'T' : 'S'}</span>
         <span className={styles.eqOp}>=</span>
         <span className={`${styles.total} ${styles.subtotalValue} ${isNegative ? styles.negative : styles.positive}`}>
@@ -68,30 +48,21 @@ export default function TapeEntry({ entry, resolvedText, runningTotal, subProduc
 
   return (
     <div
-      className={`${styles.row} ${colorNeg ? styles.negRow : ''} ${isSelected ? styles.selected : ''}`}
+      className={`${styles.row} ${colorNeg ? styles.negRow : ''} ${isSelected ? styles.selected : ''} ${clearMode ? styles.clearTarget : ''}`}
     >
-      <button
-        className={styles.deleteBtn}
-        onClick={(e) => {
-          e.stopPropagation();
-          dispatch({ type: 'DELETE_ENTRY', entryId: entry.id });
-        }}
-        aria-label="Delete entry"
-      >
-        &times;
-      </button>
-
       <div
-        className={`${styles.textZone} ${isSelected && editingMode === 'text' ? styles.activeZone : ''} ${clearMode ? styles.clearZone : ''}`}
+        className={`${styles.textZone} ${isSelected && editingMode === 'text' ? styles.activeZone : ''}`}
         onClick={() => onSelect(entry.id, 'text')}
       >
-        {displayText && (
+        {displayText ? (
           <span className={styles.textZoneLabel}>{displayText}</span>
-        )}
+        ) : isSelected && editingMode === 'text' ? (
+          <span className={styles.textZonePlaceholder}>text…</span>
+        ) : null}
       </div>
 
       <div
-        className={`${styles.numberZone} ${isSelected && editingMode === 'number' ? styles.activeZone : ''} ${clearMode ? styles.clearZone : ''}`}
+        className={`${styles.numberZone} ${isSelected && editingMode === 'number' ? styles.activeZone : ''}`}
         onClick={() => onSelect(entry.id, 'number')}
       >
         {shownValue !== null ? (
