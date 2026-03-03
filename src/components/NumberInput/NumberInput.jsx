@@ -292,7 +292,17 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
       dispatch({ type: 'ADD_ENTRY', op: pendingOp || '+', value });
       setInput('');
       setPendingOp(op !== '=' ? op : null);
-    } else if (op !== '=') {
+    } else if (op === '=') {
+      // Empty =: add s= or upgrade to T
+      const tape = appState.tapes.find((a) => a.id === activeTapeId)?.tape || [];
+      const lastEntry = tape[tape.length - 1];
+      if (lastEntry && lastEntry.op === '=') {
+        dispatch({ type: 'UPDATE_ENTRY', entryId: lastEntry.id, updates: { op: 'T' } });
+      } else if (lastEntry && lastEntry.op !== 'T') {
+        dispatch({ type: 'ADD_ENTRY', op: '=', value: 0 });
+      }
+      setPendingOp(null);
+    } else {
       // No input: set/change pending operator
       setPendingOp(op);
     }
