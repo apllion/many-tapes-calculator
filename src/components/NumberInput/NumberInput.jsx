@@ -43,6 +43,7 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
   const [quickSaved, setQuickSaved] = useState(false);
   const [saves, setSaves] = useState([]);
   const [autosaves, setAutosaves] = useState([]);
+  const [now, setNow] = useState(Date.now());
   const textRef = useRef(null);
   const fileRef = useRef(null);
   const colorRef = useRef(null);
@@ -52,6 +53,14 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
   const savedTapeRef = useRef(null); // original tape entries while editing shortcuts
   const addedTotalRef = useRef(false);
   const isEditing = editingEntry !== null && editingMode !== null;
+
+  // Tick every 10s while connecting to update wait status text
+  useEffect(() => {
+    if (sync.status !== 'connecting') return;
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), 10000);
+    return () => clearInterval(id);
+  }, [sync.status]);
 
   // Notify parent when keypadMode changes
   useEffect(() => {
@@ -143,7 +152,7 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
   // Send live preview to tape
   useEffect(() => {
     if (!onPreviewChange) return;
-    if (isEditing || viewingTotal) { onPreviewChange(null); return; }
+    if (editingEntry || viewingTotal) { onPreviewChange(null); return; }
     if (input && keypadMode === 'normal') {
       const value = parseFloat(input);
       if (!isNaN(value)) {
@@ -447,7 +456,17 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
   const empty = <button className={styles.emptyBtn} disabled />;
 
   const rawShortcuts = appState.settings?.shortcutStores || [];
-  const shortcutStores = Array.from({ length: SHORTCUT_COUNT }, (_, i) => rawShortcuts[i] || null);
+  const shortcutStores = keypadMode === 'shortcuts'
+    ? Array.from({ length: SHORTCUT_COUNT }, (_, i) => {
+        const e = (activeTape?.tape || [])[i];
+        if (!e || (e.value == null && !e.text)) return null;
+        const triple = {};
+        if (e.value != null) triple.value = e.value;
+        if (e.op && e.op !== '=' && e.op !== 'T' && e.op !== 'text') triple.op = e.op;
+        if (e.text) triple.text = e.text;
+        return Object.keys(triple).length > 0 ? triple : null;
+      })
+    : Array.from({ length: SHORTCUT_COUNT }, (_, i) => rawShortcuts[i] || null);
 
   const OP_SYMBOLS = { '+': '+', '-': '\u2212', '*': '\u00D7', '/': '\u00F7' };
 
@@ -461,8 +480,8 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
         {hasText && <span className={styles.shortcutText}>{slot.text}</span>}
         {hasValue && (
           <span className={styles.shortcutValue}>
-            {slot.op && slot.op !== '+' ? OP_SYMBOLS[slot.op] || slot.op : ''}
             {String(slot.value)}
+            {slot.op && slot.op !== '+' ? OP_SYMBOLS[slot.op] || slot.op : ''}
           </span>
         )}
       </>
@@ -608,7 +627,7 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
           <button className={styles.navBtn} onClick={() => { saveTapeName(); setKeypadMode('normal'); }}>BACK</button>
           <button className={styles.fnBtn} onClick={() => dispatch({ type: 'MOVE_TAPE_LEFT', tapeId: activeTapeId })}>&larr;</button>
           <button className={styles.fnBtn} onClick={() => dispatch({ type: 'MOVE_TAPE_RIGHT', tapeId: activeTapeId })}>&rarr;</button>
-          <button className={styles.fnBtn} style={{ fontSize: '0.55rem' }} onClick={() => dispatch({ type: 'CLEAR_TAPE' })}>Clear Tape</button>
+          <button className={styles.fnBtn} style={{ fontSize: '0.55rem', background: 'var(--color-danger, #e74c3c)', color: 'white' }} onClick={() => dispatch({ type: 'CLEAR_TAPE' })}>Clear Tape</button>
           {palette.map((hex, i) => (
             <button
               key={i}
@@ -628,6 +647,9 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
       const connected = sync.status === 'connected';
       const connecting = sync.status === 'connecting';
       const inRoom = sync.roomId !== null;
+      const waitSecs = connecting && sync.connectingSince ? Math.floor((now - sync.connectingSince) / 1000) : 0;
+      const waitLabel = waitSecs > 60 ? 'no peers found' : waitSecs >= 30 ? 'still waiting\u2026' : 'waiting\u2026';
+      const waitTimedOut = waitSecs > 60;
       return (
         <div className={styles.grid}>
           <button className={styles.navBtn} onClick={() => { setInput(''); setKeypadMode('normal'); }}>BACK</button>
@@ -654,8 +676,8 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
               <div className={styles.roomInfo}>
                 <span className={styles.roomCode}>{sync.roomId}</span>
                 <span className={styles.roomStatus}>
-                  <span className={`${styles.roomDot} ${connected ? styles.roomDotOn : connecting ? styles.roomDotWait : ''}`} />
-                  {connected ? `${sync.peerCount} peer${sync.peerCount !== 1 ? 's' : ''}` : connecting ? 'waiting\u2026' : 'offline'}
+                  <span className={`${styles.roomDot} ${connected ? styles.roomDotOn : connecting && !waitTimedOut ? styles.roomDotWait : ''}`} />
+                  {connected ? `${sync.peerCount} peer${sync.peerCount !== 1 ? 's' : ''}` : connecting ? waitLabel : 'offline'}
                 </span>
               </div>
             </>

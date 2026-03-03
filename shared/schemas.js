@@ -47,4 +47,5 @@ export const AppStateSchema = v.object({
   tapes: v.pipe(v.array(TapeSchema), v.minLength(1)),
   activeTapeId: v.string(),
   settings: v.optional(SettingsSchema),
+  lastModified: v.optional(v.number()),
 });

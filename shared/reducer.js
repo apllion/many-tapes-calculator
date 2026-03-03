@@ -227,6 +227,7 @@ export function sharedReducer(state, action) {
         ...state,
         tapes: action.tapes,
         settings: action.settings,
+        lastModified: action.lastModified || state.lastModified,
       };
 
     case 'LOAD_STATE':
@@ -272,13 +273,18 @@ export function fixDanglingPointers(state) {
 }
 
 export function reducer(state, action) {
-  let next = sharedReducer(state, action);
+  const shared = sharedReducer(state, action);
+  let next = shared;
   // Remote actions skip local view changes (each peer controls their own view)
   if (!action._remote) {
     next = localReducer(next, action);
   }
   // Always fix dangling pointers after any state change
   next = fixDanglingPointers(next);
+  // Stamp lastModified when shared state changed from a local action
+  if (!action._remote && shared !== state) {
+    next = { ...next, lastModified: Date.now() };
+  }
   return next;
 }
 

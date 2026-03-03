@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { joinRoom } from 'trystero/nostr';
 import { enrichAction } from './useAppState.js';
+import { loadRoom, saveRoom, clearRoom } from '../lib/storage.js';
 
 const APP_ID = 'many-tapes-calc-v1';
 
@@ -20,6 +21,7 @@ function getSharedState(state) {
   return {
     tapes: state.tapes,
     settings: state.settings || {},
+    lastModified: state.lastModified,
   };
 }
 
@@ -27,14 +29,18 @@ export function useSync(state, rawDispatch) {
   const [roomId, setRoomId] = useState(null);
   const [peerCount, setPeerCount] = useState(0);
   const [status, setStatus] = useState('disconnected'); // disconnected | connecting | connected
+  const [connectingSince, setConnectingSince] = useState(null);
 
   const roomRef = useRef(null);
   const sendActionRef = useRef(null);
   const sendStateRef = useRef(null);
+  const sendStateReqRef = useRef(null);
   const stateRef = useRef(state);
   stateRef.current = state;
   const reconnectRef = useRef(null); // { code, isCreator, timer, delay }
   const heartbeatRef = useRef(null);
+  const establishedRef = useRef(false);
+  const stateReqTimerRef = useRef(null);
 
   const clearReconnect = useCallback(() => {
     if (reconnectRef.current?.timer) {
@@ -49,15 +55,22 @@ export function useSync(state, rawDispatch) {
       clearInterval(heartbeatRef.current);
       heartbeatRef.current = null;
     }
+    if (stateReqTimerRef.current) {
+      clearTimeout(stateReqTimerRef.current);
+      stateReqTimerRef.current = null;
+    }
     if (roomRef.current) {
       roomRef.current.leave();
       roomRef.current = null;
     }
     sendActionRef.current = null;
     sendStateRef.current = null;
+    sendStateReqRef.current = null;
+    establishedRef.current = false;
     setPeerCount(0);
     setStatus('disconnected');
     setRoomId(null);
+    setConnectingSince(null);
   }, [clearReconnect]);
 
   const connect = useCallback((code, isCreator) => {
@@ -66,15 +79,29 @@ export function useSync(state, rawDispatch) {
       clearInterval(heartbeatRef.current);
       heartbeatRef.current = null;
     }
+    if (stateReqTimerRef.current) {
+      clearTimeout(stateReqTimerRef.current);
+      stateReqTimerRef.current = null;
+    }
     if (roomRef.current) {
       roomRef.current.leave();
       roomRef.current = null;
     }
     sendActionRef.current = null;
     sendStateRef.current = null;
+    sendStateReqRef.current = null;
 
     setStatus('connecting');
+    setConnectingSince((prev) => prev ?? Date.now());
     setRoomId(code);
+
+    // Persist room for auto-rejoin
+    saveRoom(code, isCreator);
+
+    // Creators are established from the start (they own the state).
+    if (isCreator) {
+      establishedRef.current = true;
+    }
 
     // Store reconnect info
     if (!reconnectRef.current || reconnectRef.current.code !== code) {
@@ -91,16 +118,14 @@ export function useSync(state, rawDispatch) {
     }
     roomRef.current = room;
 
-    // Creators are established from the start (they own the state).
-    // Joiners become established after receiving their first state sync.
-    let established = isCreator;
-
     const [sendAction, onAction] = room.makeAction('action');
     const [sendState, onState] = room.makeAction('state');
     const [sendPing, onPing] = room.makeAction('ping');
+    const [sendStateReq, onStateReq] = room.makeAction('stateReq');
 
     sendActionRef.current = sendAction;
     sendStateRef.current = sendState;
+    sendStateReqRef.current = sendStateReq;
 
     // Heartbeat ping every 15s
     const heartbeatInterval = setInterval(() => {
@@ -113,11 +138,21 @@ export function useSync(state, rawDispatch) {
     room.onPeerJoin((peerId) => {
       setPeerCount(Object.keys(room.getPeers()).length);
       setStatus('connected');
+      setConnectingSince(null);
       // Reset reconnect delay on successful connection
       if (reconnectRef.current) reconnectRef.current.delay = 1000;
       // Only send state if we're established (creator or already synced)
-      if (established) {
+      if (establishedRef.current) {
         sendState(getSharedState(stateRef.current), peerId);
+      } else {
+        // Not yet established — set a 5s timer to request state if not received
+        if (stateReqTimerRef.current) clearTimeout(stateReqTimerRef.current);
+        stateReqTimerRef.current = setTimeout(() => {
+          stateReqTimerRef.current = null;
+          if (!establishedRef.current) {
+            sendStateReq({}, peerId);
+          }
+        }, 5000);
       }
     });
 
@@ -126,6 +161,7 @@ export function useSync(state, rawDispatch) {
       setPeerCount(count);
       if (count === 0) {
         setStatus('connecting');
+        setConnectingSince((prev) => prev ?? Date.now());
         scheduleReconnect();
       }
     });
@@ -136,14 +172,35 @@ export function useSync(state, rawDispatch) {
     });
 
     onState((sharedState) => {
+      // Cancel pending state request timer
+      if (stateReqTimerRef.current) {
+        clearTimeout(stateReqTimerRef.current);
+        stateReqTimerRef.current = null;
+      }
+      // Only apply incoming state if it's newer (or we have no timestamp)
+      const localModified = stateRef.current.lastModified;
+      const remoteModified = sharedState.lastModified;
+      if (localModified && remoteModified && remoteModified < localModified) {
+        // Our state is newer — don't overwrite, but mark as established
+        establishedRef.current = true;
+        return;
+      }
       // Now we have authoritative state — we're established
-      established = true;
+      establishedRef.current = true;
       rawDispatch({
         type: 'SYNC_STATE',
         tapes: sharedState.tapes,
         settings: sharedState.settings,
+        lastModified: sharedState.lastModified,
         _remote: true,
       });
+    });
+
+    // Respond to state requests from peers
+    onStateReq((_data, peerId) => {
+      if (establishedRef.current) {
+        sendState(getSharedState(stateRef.current), peerId);
+      }
     });
 
     // Return cleanup for heartbeat
@@ -162,6 +219,18 @@ export function useSync(state, rawDispatch) {
 
   // Cleanup on unmount
   useEffect(() => cleanup, [cleanup]);
+
+  // Auto-rejoin persisted room on mount
+  useEffect(() => {
+    const saved = loadRoom();
+    if (saved) {
+      // If local state has lastModified, returning peer has valid state
+      if (stateRef.current.lastModified) {
+        establishedRef.current = true;
+      }
+      connect(saved.code, saved.isCreator);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Visibility-based immediate reconnect
   useEffect(() => {
@@ -192,6 +261,7 @@ export function useSync(state, rawDispatch) {
   }, [connect]);
 
   const leaveRoom = useCallback(() => {
+    clearRoom();
     cleanup();
   }, [cleanup]);
 
@@ -220,6 +290,7 @@ export function useSync(state, rawDispatch) {
     roomId,
     peerCount,
     status,
+    connectingSince,
     createRoom,
     joinRoom: joinRoomByCode,
     leaveRoom,

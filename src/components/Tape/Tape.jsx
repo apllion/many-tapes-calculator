@@ -6,7 +6,7 @@ import styles from './Tape.module.css';
 
 export { computeRunningTotals };
 
-export default function Tape({ tape, dispatch, editingId, editingMode, onSelect, settings, previewEntry, editingInput, clearMode, onClearEntry }) {
+export default function Tape({ tape, dispatch, editingId, editingMode, onSelect, settings, previewEntry, editingInput, clearMode, onClearEntry, onClearField }) {
   const bottomRef = useRef(null);
   const { totals, subProducts } = computeRunningTotals(tape, settings?.calculationMode);
 
@@ -40,7 +40,11 @@ export default function Tape({ tape, dispatch, editingId, editingMode, onSelect,
 
   function handleEntryTap(id, mode) {
     if (clearMode) {
-      onClearEntry(id);
+      if (id === editingId) {
+        onClearField(id, mode);
+      } else {
+        onClearEntry(id);
+      }
       return;
     }
     if (id !== editingId) {

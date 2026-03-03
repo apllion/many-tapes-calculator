@@ -100,6 +100,12 @@ export default function App() {
             setClearMode(false);
             clearTimeout(clearModeTimer.current);
           }}
+          onClearField={(entryId, field) => {
+            const updates = field === 'text' ? { text: undefined } : { value: null };
+            d({ type: 'UPDATE_ENTRY', entryId, updates });
+            setClearMode(false);
+            clearTimeout(clearModeTimer.current);
+          }}
         />
       )}
       <NumberInput
