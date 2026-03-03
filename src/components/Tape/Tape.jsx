@@ -6,7 +6,7 @@ import styles from './Tape.module.css';
 
 export { computeRunningTotals };
 
-export default function Tape({ tape, dispatch, editingId, editingMode, onSelect, settings, previewEntry }) {
+export default function Tape({ tape, dispatch, editingId, editingMode, onSelect, settings, previewEntry, editingInput, clearMode, onClearEntry }) {
   const bottomRef = useRef(null);
   const { totals, subProducts } = computeRunningTotals(tape, settings?.calculationMode);
 
@@ -37,6 +37,23 @@ export default function Tape({ tape, dispatch, editingId, editingMode, onSelect,
   }, [tape.length]);
 
   const fmt = settings?.numberFormat;
+
+  function handleEntryTap(id, mode) {
+    if (clearMode) {
+      onClearEntry(id);
+      return;
+    }
+    if (id !== editingId) {
+      // First tap: select only (editingMode = null)
+      onSelect(id, null);
+    } else if (editingMode === null) {
+      // Second tap: enter edit mode
+      onSelect(id, mode);
+    } else {
+      // Already editing: toggle/switch via original handler
+      onSelect(id, mode);
+    }
+  }
 
   function renderPreview() {
     if (!previewEntry) return null;
@@ -86,8 +103,10 @@ export default function Tape({ tape, dispatch, editingId, editingMode, onSelect,
                 dispatch={dispatch}
                 isSelected={entry.id === editingId}
                 editingMode={entry.id === editingId ? editingMode : null}
-                onSelect={onSelect}
+                onSelect={handleEntryTap}
                 settings={settings}
+                editingInput={entry.id === editingId ? editingInput : null}
+                clearMode={clearMode && entry.id === editingId}
               />
               {i === insertAfterIndex && renderPreview()}
             </Fragment>

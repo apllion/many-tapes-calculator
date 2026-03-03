@@ -88,6 +88,24 @@ export function sharedReducer(state, action) {
         tape: a.tape.filter((e) => e.id !== action.entryId),
       }));
 
+    case 'MOVE_ENTRY_UP':
+      return mapTape(state, action.tapeId, (a) => {
+        const idx = a.tape.findIndex((e) => e.id === action.entryId);
+        if (idx <= 0) return a;
+        const tape = [...a.tape];
+        [tape[idx - 1], tape[idx]] = [tape[idx], tape[idx - 1]];
+        return { ...a, tape };
+      });
+
+    case 'MOVE_ENTRY_DOWN':
+      return mapTape(state, action.tapeId, (a) => {
+        const idx = a.tape.findIndex((e) => e.id === action.entryId);
+        if (idx < 0 || idx >= a.tape.length - 1) return a;
+        const tape = [...a.tape];
+        [tape[idx], tape[idx + 1]] = [tape[idx + 1], tape[idx]];
+        return { ...a, tape };
+      });
+
     case 'ADD_ENTRY_ALL': {
       const entry = {
         op: action.op,
@@ -105,6 +123,9 @@ export function sharedReducer(state, action) {
 
     case 'CLEAR_TAPE':
       return mapTape(state, action.tapeId, (a) => ({ ...a, tape: [] }));
+
+    case 'SET_TAPE_ENTRIES':
+      return mapTape(state, action.tapeId, (a) => ({ ...a, tape: action.entries }));
 
     case 'ADD_TAPE': {
       const isTotal = !!action.totalConfig;
@@ -268,8 +289,8 @@ export function enrichAction(action, state) {
   // Auto-populate tapeId for actions that target the active tape
   const needsTapeId = [
     'ADD_ENTRY', 'ADD_ENTRY_AND_TOTAL', 'INSERT_ENTRY',
-    'UPDATE_ENTRY', 'DELETE_ENTRY', 'CLEAR_TAPE',
-    'SET_TOTAL_STARTING_VALUE',
+    'UPDATE_ENTRY', 'DELETE_ENTRY', 'MOVE_ENTRY_UP', 'MOVE_ENTRY_DOWN',
+    'CLEAR_TAPE', 'SET_TAPE_ENTRIES', 'SET_TOTAL_STARTING_VALUE',
   ];
   if (needsTapeId.includes(action.type) && !action.tapeId) {
     enriched.tapeId = state.activeTapeId;

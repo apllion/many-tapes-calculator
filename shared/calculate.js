@@ -24,7 +24,7 @@ export function computeRunningTotals(tape, mode = 'arithmetic') {
   for (let i = 0; i < tape.length; i++) {
     const entry = tape[i];
 
-    if (entry.op === 'text') {
+    if (entry.op === 'text' || entry.value == null) {
       totals.push(totals.length > 0 ? totals[totals.length - 1] : 0);
       subProducts.push(null);
       continue;
@@ -99,7 +99,7 @@ function computeRunningTotalsAdding(tape) {
   for (let i = 0; i < tape.length; i++) {
     const entry = tape[i];
 
-    if (entry.op === 'text') {
+    if (entry.op === 'text' || entry.value == null) {
       totals.push(totals.length > 0 ? totals[totals.length - 1] : 0);
       subProducts.push(null);
       continue;

@@ -36,7 +36,7 @@ function downloadJSON(data, filename) {
   URL.revokeObjectURL(url);
 }
 
-export default function NumberInput({ dispatch, editingEntry, editingMode, onDoneEditing, onSelectEntry, subtotal, currentSubProduct, activeTapeId, activeTapeName, activeTapeColor, appState, activeTape, viewingTotal, sync, onTotalConfigChange, configRequest, onConfigDone, onPreviewChange, onKeypadModeChange, clearMode, setClearMode, clearModeTimer }) {
+export default function NumberInput({ dispatch, editingEntry, editingMode, onDoneEditing, onSelectEntry, subtotal, currentSubProduct, activeTapeId, activeTapeName, activeTapeColor, appState, activeTape, viewingTotal, sync, onTotalConfigChange, configRequest, onConfigDone, onPreviewChange, onEditingInputChange, onKeypadModeChange, clearMode, setClearMode, clearModeTimer }) {
   const [input, setInput] = useState('');
   const [keypadMode, setKeypadMode] = useState('normal');
   const [freshEdit, setFreshEdit] = useState(false);
@@ -49,8 +49,9 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
   const colorIndexRef = useRef(null);
   const saveLongRef = useRef(null);
   const activeShortcutRef = useRef(null); // { index, entryId } when editing a recalled shortcut
+  const savedTapeRef = useRef(null); // original tape entries while editing shortcuts
   const addedTotalRef = useRef(false);
-  const isEditing = editingEntry !== null;
+  const isEditing = editingEntry !== null && editingMode !== null;
 
   // Notify parent when keypadMode changes
   useEffect(() => {
@@ -98,19 +99,30 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
     }
   }, [activeTapeId]);
 
-  // Don't auto-open total config when selecting a total tape; reset when leaving
+  // Adapt tape/total config when switching tapes; stay in config mode
   useEffect(() => {
     if (viewingTotal) {
       if (addedTotalRef.current) {
         addedTotalRef.current = false;
-      } else {
+      } else if (keypadMode === 'tape') {
+        // Switched from regular tape to total — adapt to total mode
+        setInput(activeTapeName);
+        setKeypadMode('total');
+      } else if (keypadMode !== 'total') {
         setInput('');
         setKeypadMode('normal');
+      } else {
+        // Already in total mode, just update the name
+        setInput(activeTapeName);
       }
     } else {
-      if (keypadMode === 'tape' || keypadMode === 'total') {
-        setInput('');
-        setKeypadMode('normal');
+      if (keypadMode === 'total') {
+        // Switched from total to regular tape — adapt to tape mode
+        setInput(activeTapeName);
+        setKeypadMode('tape');
+      } else if (keypadMode === 'tape') {
+        // Already in tape mode, just update the name
+        setInput(activeTapeName);
       }
     }
   }, [activeTape?.id, viewingTotal]);
@@ -142,6 +154,16 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
     onPreviewChange(null);
   }, [input, keypadMode, isEditing, viewingTotal]);
 
+  // Send live editing input to tape for instant preview
+  useEffect(() => {
+    if (!onEditingInputChange) return;
+    if (isEditing) {
+      onEditingInputChange(input);
+    } else {
+      onEditingInputChange(null);
+    }
+  }, [input, isEditing]);
+
   // Clear active shortcut tracking when editing a different entry
   useEffect(() => {
     if (activeShortcutRef.current && editingEntry?.id !== activeShortcutRef.current.entryId) {
@@ -153,7 +175,7 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
   useEffect(() => {
     function handleKeyDown(e) {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-      if (keypadMode !== 'normal') return;
+      if (keypadMode !== 'normal' && keypadMode !== 'shortcuts') return;
       const key = e.key;
       if (key >= '0' && key <= '9') { press(key); e.preventDefault(); }
       else if (key === '.') { press('.'); e.preventDefault(); }
@@ -249,13 +271,11 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
   }
 
   function handleClear() {
-    // Always clear input first
     setFreshEdit(false);
+    setInput('');
     if (isEditing) {
-      setInput('');
-      onDoneEditing();
-    } else {
-      setInput('');
+      // Go back to "selected" state (keep editingId, clear editingMode)
+      onSelectEntry(editingEntry.id, null);
     }
     // Enter clear mode
     setClearMode(true);
@@ -429,28 +449,50 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
   const rawShortcuts = appState.settings?.shortcutStores || [];
   const shortcutStores = Array.from({ length: SHORTCUT_COUNT }, (_, i) => rawShortcuts[i] || null);
 
+  const OP_SYMBOLS = { '+': '+', '-': '\u2212', '*': '\u00D7', '/': '\u00F7' };
+
   function shortcutPreview(slot) {
-    if (!slot) return '';
-    const parts = [];
-    if (slot.text) parts.push(slot.text);
-    if (slot.value != null) parts.push(String(slot.value));
-    if (slot.op && slot.op !== '+') parts.push(slot.op);
-    return parts.join(' ').slice(0, 8);
+    if (!slot) return null;
+    const hasText = !!slot.text;
+    const hasValue = slot.value != null;
+    if (!hasText && !hasValue) return null;
+    return (
+      <>
+        {hasText && <span className={styles.shortcutText}>{slot.text}</span>}
+        {hasValue && (
+          <span className={styles.shortcutValue}>
+            {slot.op && slot.op !== '+' ? OP_SYMBOLS[slot.op] || slot.op : ''}
+            {String(slot.value)}
+          </span>
+        )}
+      </>
+    );
   }
 
   function shortcutSave(index) {
-    const val = parseFloat(input);
-    const hasNumber = !isNaN(val) && input.trim() !== '';
-    const hasText = editingEntry?.text;
-    if (!hasNumber && !hasText) return;
-    const triple = {};
-    if (hasNumber) triple.value = val;
-    if (editingEntry) {
-      if (editingEntry.op && editingEntry.op !== '=' && editingEntry.op !== 'T' && editingEntry.op !== 'text') {
-        triple.op = editingEntry.op;
+    // Source: selected/editing entry, or last regular tape entry
+    let entry = editingEntry;
+    if (!entry) {
+      const tape = activeTape?.tape || [];
+      for (let i = tape.length - 1; i >= 0; i--) {
+        if (tape[i].op !== '=' && tape[i].op !== 'T' && tape[i].op !== 'text') {
+          entry = tape[i]; break;
+        }
       }
-      if (editingEntry.text) triple.text = editingEntry.text;
     }
+    if (!entry) return;
+    const triple = {};
+    const val = parseFloat(input);
+    if (!isNaN(val) && input.trim() !== '') {
+      triple.value = val;
+    } else if (entry.value != null) {
+      triple.value = entry.value;
+    }
+    if (entry.op && entry.op !== '=' && entry.op !== 'T' && entry.op !== 'text') {
+      triple.op = entry.op;
+    }
+    if (entry.text) triple.text = entry.text;
+    if (Object.keys(triple).length === 0) return;
     dispatch({ type: 'SET_SHORTCUT_STORE', index, data: triple });
   }
 
@@ -472,6 +514,44 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
     setInput(stored.value != null ? String(stored.value) : '');
     onSelectEntry(newId, 'number');
     activeShortcutRef.current = { index, entryId: newId };
+  }
+
+  function enterShortcutsMode() {
+    savedTapeRef.current = [...(activeTape?.tape || [])];
+    const entries = shortcutStores
+      .filter((s) => s)
+      .map((s) => ({
+        id: generateId(),
+        op: s.op || '+',
+        value: s.value ?? null,
+        ...(s.text ? { text: s.text } : {}),
+        timestamp: Date.now(),
+      }));
+    dispatch({ type: 'SET_TAPE_ENTRIES', entries });
+    setInput('');
+    setKeypadMode('shortcuts');
+  }
+
+  function exitShortcutsMode() {
+    // Deselect any editing entry
+    if (isEditing) onDoneEditing();
+    // Read current tape entries back as shortcuts
+    const tape = activeTape?.tape || [];
+    const newShortcuts = Array.from({ length: SHORTCUT_COUNT }, (_, i) => {
+      const e = tape[i];
+      if (!e || (e.value == null && !e.text)) return null;
+      const triple = {};
+      if (e.value != null) triple.value = e.value;
+      if (e.op && e.op !== '=' && e.op !== 'T' && e.op !== 'text') triple.op = e.op;
+      if (e.text) triple.text = e.text;
+      return Object.keys(triple).length > 0 ? triple : null;
+    });
+    dispatch({ type: 'SET_SETTING', key: 'shortcutStores', value: newShortcuts });
+    // Restore original tape
+    dispatch({ type: 'SET_TAPE_ENTRIES', entries: savedTapeRef.current || [] });
+    savedTapeRef.current = null;
+    setInput('');
+    setKeypadMode('normal');
   }
 
   function onShortcutTap(index) {
@@ -528,7 +608,7 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
           <button className={styles.navBtn} onClick={() => { saveTapeName(); setKeypadMode('normal'); }}>BACK</button>
           <button className={styles.fnBtn} onClick={() => dispatch({ type: 'MOVE_TAPE_LEFT', tapeId: activeTapeId })}>&larr;</button>
           <button className={styles.fnBtn} onClick={() => dispatch({ type: 'MOVE_TAPE_RIGHT', tapeId: activeTapeId })}>&rarr;</button>
-          <button className={styles.fnBtn} style={{ fontSize: '0.55rem' }} onClick={() => dispatch({ type: 'SET_SETTING', key: 'palette', value: DEFAULT_PALETTE })}>Reset Colors</button>
+          <button className={styles.fnBtn} style={{ fontSize: '0.55rem' }} onClick={() => dispatch({ type: 'CLEAR_TAPE' })}>Clear Tape</button>
           {palette.map((hex, i) => (
             <button
               key={i}
@@ -722,7 +802,8 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
             setInput(activeTapeName);
             setKeypadMode(viewingTotal ? 'total' : 'tape');
           }}>{viewingTotal ? 'TOTAL' : 'TAPE'}</button>
-          {empty}{empty}{empty}
+          <button className={styles.wideBtn} onClick={enterShortcutsMode}>SHORTCUTS</button>
+          {empty}{empty}
           <button className={styles.wideBtn} onClick={() => setKeypadMode('setup')}>SETUP</button>
           <button className={styles.wideBtn} onClick={() => { setSaves(loadSaves()); setAutosaves(loadAutosaves()); setInput(''); setKeypadMode('saves'); }}>SAVE</button>
           <button className={styles.wideBtn} onClick={() => { setSaves(loadSaves()); setAutosaves(loadAutosaves()); setInput(''); setKeypadMode('loads'); }}>LOAD</button>
@@ -737,13 +818,22 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
       <div className={styles.keypadRow}>
         <div className={styles.sideColumn}>
           <button className={`${styles.clearBtn} ${clearMode ? styles.clearModeActive : ''}`} onClick={handleClear}>C</button>
-          <button
-            className={`${styles.quickSaveBtn} ${quickSaved ? styles.quickSaved : ''}`}
-            onClick={quickSave}
-          >{quickSaved ? '\u2713' : '\u25CF'}</button>
+          {editingEntry ? (
+            <button className={styles.fnBtn} onClick={() => dispatch({ type: 'MOVE_ENTRY_UP', entryId: editingEntry.id })}>&uarr;</button>
+          ) : (
+            <button
+              className={`${styles.quickSaveBtn} ${quickSaved ? styles.quickSaved : ''}`}
+              onClick={quickSave}
+            >{quickSaved ? '\u2713' : '\u25CF'}</button>
+          )}
           <button className={styles.newBtn} onClick={handleNew}>NL</button>
-          {empty}
-          <button className={styles.modeBtn} onClick={() => setKeypadMode('menu')}>MODE</button>
+          {editingEntry ? (
+            <button className={styles.fnBtn} onClick={() => dispatch({ type: 'MOVE_ENTRY_DOWN', entryId: editingEntry.id })}>&darr;</button>
+          ) : empty}
+          {keypadMode === 'shortcuts'
+            ? <button className={styles.navBtn} onClick={exitShortcutsMode}>DONE</button>
+            : <button className={styles.modeBtn} onClick={() => setKeypadMode('menu')}>MODE</button>
+          }
         </div>
         <div className={styles.grid}>
           <button className={styles.fnBtn} onClick={backspace}>&larr;</button>
@@ -778,6 +868,7 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
   function getDisplayLabel() {
     if (isEditing && editingMode === 'text') return 'EDIT TEXT';
     if (isEditing) return 'EDIT';
+    if (keypadMode === 'shortcuts') return 'SHORTCUTS';
     if (keypadMode === 'total') return '\u03A3 NAME';
     if (keypadMode === 'tape') return 'TAPE';
     if (keypadMode === 'setup') return 'SETUP';

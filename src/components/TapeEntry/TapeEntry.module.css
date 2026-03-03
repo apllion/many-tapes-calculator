@@ -247,3 +247,13 @@
 .subtotalValue {
   font-weight: 700;
 }
+
+/* Clear mode: red inset borders on selected row zones */
+
+.clearTarget {
+  box-shadow: inset 0 0 0 2px var(--color-danger, #e74c3c);
+}
+
+.clearZone {
+  box-shadow: inset 0 0 0 2px var(--color-danger, #e74c3c);
+}

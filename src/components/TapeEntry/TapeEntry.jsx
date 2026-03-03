@@ -3,7 +3,7 @@ import styles from './TapeEntry.module.css';
 
 const OP_SYMBOLS = { '+': '+', '-': '\u2212', '*': '\u00d7', '/': '\u00f7' };
 
-export default function TapeEntry({ entry, resolvedText, runningTotal, subProduct, dispatch, isSelected, editingMode, onSelect, settings }) {
+export default function TapeEntry({ entry, resolvedText, runningTotal, subProduct, dispatch, isSelected, editingMode, onSelect, settings, editingInput, clearMode }) {
   const fmt = settings?.numberFormat;
   const displayValue = subProduct !== null ? subProduct : runningTotal;
   const isNegative = displayValue < 0;
@@ -14,7 +14,7 @@ export default function TapeEntry({ entry, resolvedText, runningTotal, subProduc
   if (entry.op === 'text') {
     return (
       <div
-        className={`${styles.row} ${styles.textRow} ${isSelected ? styles.selected : ''}`}
+        className={`${styles.row} ${styles.textRow} ${isSelected ? styles.selected : ''} ${clearMode ? styles.clearTarget : ''}`}
         onClick={() => onSelect(entry.id, 'text')}
       >
         <button
@@ -38,7 +38,7 @@ export default function TapeEntry({ entry, resolvedText, runningTotal, subProduc
     const isTotal = entry.op === 'T';
     return (
       <div
-        className={`${styles.row} ${isTotal ? styles.totalRow : styles.subtotalRow} ${isSelected ? styles.selected : ''}`}
+        className={`${styles.row} ${isTotal ? styles.totalRow : styles.subtotalRow} ${isSelected ? styles.selected : ''} ${clearMode ? styles.clearTarget : ''}`}
         onClick={() => onSelect(entry.id, 'number')}
       >
         <button
@@ -60,7 +60,11 @@ export default function TapeEntry({ entry, resolvedText, runningTotal, subProduc
     );
   }
 
-  const displayText = resolvedText || entry.text;
+  // Live editing preview: override displayed text/value while typing
+  const liveText = editingMode === 'text' && editingInput != null ? editingInput : null;
+  const liveValue = editingMode === 'number' && editingInput != null ? parseFloat(editingInput) : null;
+  const displayText = liveText != null ? liveText : (resolvedText || entry.text);
+  const shownValue = liveValue != null && !isNaN(liveValue) ? liveValue : entry.value;
 
   return (
     <div
@@ -78,7 +82,7 @@ export default function TapeEntry({ entry, resolvedText, runningTotal, subProduc
       </button>
 
       <div
-        className={`${styles.textZone} ${isSelected && editingMode === 'text' ? styles.activeZone : ''}`}
+        className={`${styles.textZone} ${isSelected && editingMode === 'text' ? styles.activeZone : ''} ${clearMode ? styles.clearZone : ''}`}
         onClick={() => onSelect(entry.id, 'text')}
       >
         {displayText && (
@@ -87,13 +91,13 @@ export default function TapeEntry({ entry, resolvedText, runningTotal, subProduc
       </div>
 
       <div
-        className={`${styles.numberZone} ${isSelected && editingMode === 'number' ? styles.activeZone : ''}`}
+        className={`${styles.numberZone} ${isSelected && editingMode === 'number' ? styles.activeZone : ''} ${clearMode ? styles.clearZone : ''}`}
         onClick={() => onSelect(entry.id, 'number')}
       >
-        {entry.value !== null ? (
+        {shownValue !== null ? (
           <>
             <span className={styles.value}>
-              {formatNumber(entry.value, fmt)}
+              {formatNumber(shownValue, fmt)}
             </span>
             <span className={styles.op}>
               {OP_SYMBOLS[entry.op]}

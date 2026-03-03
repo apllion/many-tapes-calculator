@@ -18,6 +18,7 @@ export default function App() {
   const [totalConfigOpen, setTotalConfigOpen] = useState(false);
   const [configRequest, setConfigRequest] = useState(null);
   const [previewEntry, setPreviewEntry] = useState(null);
+  const [editingInput, setEditingInput] = useState(null);
   const [keypadMode, setKeypadMode] = useState('normal');
   const [clearMode, setClearMode] = useState(false);
   const clearModeTimer = useRef(null);
@@ -83,25 +84,6 @@ export default function App() {
       />
       {viewingTotal ? (
         <TotalTape tape={activeTape} tapes={state.tapes} settings={settings} dispatch={d} showDeselected={totalConfigOpen} />
-      ) : clearMode ? (
-        <div
-          className={styles.clearModeTape}
-          onClick={() => {
-            d({ type: 'CLEAR_TAPE' });
-            setClearMode(false);
-            clearTimeout(clearModeTimer.current);
-          }}
-        >
-          <Tape
-            tape={activeTape.tape}
-            dispatch={d}
-            editingId={editingId}
-            editingMode={editingMode}
-            onSelect={handleSelect}
-            settings={settings}
-            previewEntry={previewEntry}
-          />
-        </div>
       ) : (
         <Tape
           tape={activeTape.tape}
@@ -111,6 +93,13 @@ export default function App() {
           onSelect={handleSelect}
           settings={settings}
           previewEntry={previewEntry}
+          editingInput={editingInput}
+          clearMode={clearMode}
+          onClearEntry={(entryId) => {
+            d({ type: 'DELETE_ENTRY', entryId });
+            setClearMode(false);
+            clearTimeout(clearModeTimer.current);
+          }}
         />
       )}
       <NumberInput
@@ -132,6 +121,7 @@ export default function App() {
         configRequest={configRequest}
         onConfigDone={() => setConfigRequest(null)}
         onPreviewChange={setPreviewEntry}
+        onEditingInputChange={setEditingInput}
         onKeypadModeChange={setKeypadMode}
         clearMode={clearMode}
         setClearMode={setClearMode}
