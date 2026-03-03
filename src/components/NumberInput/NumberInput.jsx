@@ -318,6 +318,12 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
 
   function handleClear() {
     setFreshEdit(false);
+    if (input) {
+      // First C press: clear input only
+      setInput('');
+      setPendingOp(null);
+      return;
+    }
     setInput('');
     setPendingOp(null);
     if (isEditing) {
