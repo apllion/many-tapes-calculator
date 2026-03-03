@@ -21,7 +21,8 @@ export default function App() {
   const [editingInput, setEditingInput] = useState(null);
   const [keypadMode, setKeypadMode] = useState('normal');
   const [clearMode, setClearMode] = useState(false);
-  const [clearHighlight, setClearHighlight] = useState(null); // null | 'number' | 'text'
+  const [clearHighlight, setClearHighlight] = useState(null); // null | 'number' | 'text' | 'both'
+  const [clearInputSignal, setClearInputSignal] = useState(0);
   const clearModeTimer = useRef(null);
   const clearHighlightTimer = useRef(null);
 
@@ -54,6 +55,24 @@ export default function App() {
     } else {
       setEditingId(id);
       setEditingMode(mode);
+    }
+  }
+
+  function handleClearText(entryId) {
+    d({ type: 'UPDATE_ENTRY', entryId, updates: { text: undefined } });
+    setClearHighlight(null);
+    clearTimeout(clearHighlightTimer.current);
+    if (editingMode === 'text') {
+      setClearInputSignal(c => c + 1);
+    }
+  }
+
+  function handleClearNumber(entryId) {
+    d({ type: 'UPDATE_ENTRY', entryId, updates: { value: null } });
+    setClearHighlight(null);
+    clearTimeout(clearHighlightTimer.current);
+    if (editingMode === 'number') {
+      setClearInputSignal(c => c + 1);
     }
   }
 
@@ -102,6 +121,8 @@ export default function App() {
             setClearMode(false);
             clearTimeout(clearModeTimer.current);
           }}
+          onClearText={handleClearText}
+          onClearNumber={handleClearNumber}
         />
       )}
       <NumberInput
@@ -128,8 +149,10 @@ export default function App() {
         clearMode={clearMode}
         setClearMode={setClearMode}
         clearModeTimer={clearModeTimer}
+        clearHighlight={clearHighlight}
         setClearHighlight={setClearHighlight}
         clearHighlightTimer={clearHighlightTimer}
+        clearInputSignal={clearInputSignal}
       />
     </div>
   );

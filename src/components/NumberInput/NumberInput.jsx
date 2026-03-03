@@ -36,7 +36,7 @@ function downloadJSON(data, filename) {
   URL.revokeObjectURL(url);
 }
 
-export default function NumberInput({ dispatch, editingEntry, editingMode, onDoneEditing, onSelectEntry, subtotal, currentSubProduct, activeTapeId, activeTapeName, activeTapeColor, appState, activeTape, viewingTotal, sync, onTotalConfigChange, configRequest, onConfigDone, onPreviewChange, onEditingInputChange, onKeypadModeChange, clearMode, setClearMode, clearModeTimer, setClearHighlight, clearHighlightTimer }) {
+export default function NumberInput({ dispatch, editingEntry, editingMode, onDoneEditing, onSelectEntry, subtotal, currentSubProduct, activeTapeId, activeTapeName, activeTapeColor, appState, activeTape, viewingTotal, sync, onTotalConfigChange, configRequest, onConfigDone, onPreviewChange, onEditingInputChange, onKeypadModeChange, clearMode, setClearMode, clearModeTimer, clearHighlight, setClearHighlight, clearHighlightTimer, clearInputSignal }) {
   const [input, setInput] = useState('');
   const [pendingOp, setPendingOp] = useState(null);
   const [keypadMode, setKeypadMode] = useState('normal');
@@ -186,6 +186,20 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
     }
   }, [editingEntry?.id]);
 
+  // Dismiss clear highlight when switching entries
+  useEffect(() => {
+    setClearHighlight(null);
+    clearTimeout(clearHighlightTimer.current);
+  }, [editingEntry?.id]);
+
+  // Clear input when signaled by App (zone clear callbacks)
+  useEffect(() => {
+    if (clearInputSignal > 0) {
+      setInput('');
+      setFreshEdit(false);
+    }
+  }, [clearInputSignal]);
+
   // Keyboard input for PC
   useEffect(() => {
     function handleKeyDown(e) {
@@ -207,6 +221,10 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
   });
 
   function submit(op) {
+    if (clearHighlight) {
+      setClearHighlight(null);
+      clearTimeout(clearHighlightTimer.current);
+    }
     setFreshEdit(false);
     if (isEditing) {
       if (editingEntry.op === '=' || editingEntry.op === 'T' || editingEntry.op === 'text') {
@@ -319,27 +337,22 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
   function flashHighlight(zone) {
     setClearHighlight(zone);
     clearTimeout(clearHighlightTimer.current);
-    clearHighlightTimer.current = setTimeout(() => setClearHighlight(null), 600);
+    clearHighlightTimer.current = setTimeout(() => setClearHighlight(null), 1500);
   }
 
   function handleClear() {
     setFreshEdit(false);
     if (isEditing) {
-      if (input) {
-        // Clear number input, flash number zone
-        setInput('');
-        setPendingOp(null);
-        flashHighlight('number');
+      if (clearHighlight) {
+        // Second C while highlight active → deselect
+        setClearHighlight(null);
+        clearTimeout(clearHighlightTimer.current);
+        onDoneEditing();
         return;
       }
-      if (editingEntry.text) {
-        // Clear text label, flash text zone
-        dispatch({ type: 'UPDATE_ENTRY', entryId: editingEntry.id, updates: { text: undefined } });
-        flashHighlight('text');
-        return;
-      }
-      // Nothing left to clear — deselect
-      onSelectEntry(editingEntry.id, null);
+      // First C → show red borders on both zones
+      flashHighlight('both');
+      return;
     }
     setInput('');
     setPendingOp(null);
@@ -350,6 +363,10 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
   }
 
   function press(digit) {
+    if (clearHighlight) {
+      setClearHighlight(null);
+      clearTimeout(clearHighlightTimer.current);
+    }
     if (freshEdit) {
       setInput(digit);
       setFreshEdit(false);
