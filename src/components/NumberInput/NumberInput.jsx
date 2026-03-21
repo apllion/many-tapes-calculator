@@ -50,7 +50,6 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
   const colorRef = useRef(null);
   const colorIndexRef = useRef(null);
   const saveLongRef = useRef(null);
-  const activeShortcutRef = useRef(null); // { index, entryId } when editing a recalled shortcut
   const savedTapeRef = useRef(null); // original tape entries while editing shortcuts
   const addedTotalRef = useRef(false);
   const isEditing = editingEntry !== null && editingMode !== null;
@@ -179,13 +178,6 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
     }
   }, [input, isEditing]);
 
-  // Clear active shortcut tracking when editing a different entry
-  useEffect(() => {
-    if (activeShortcutRef.current && editingEntry?.id !== activeShortcutRef.current.entryId) {
-      activeShortcutRef.current = null;
-    }
-  }, [editingEntry?.id]);
-
   // Dismiss clear highlight when switching entries
   useEffect(() => {
     setClearHighlight(null);
@@ -243,17 +235,6 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
       if (Object.keys(updates).length > 0) {
         dispatch({ type: 'UPDATE_ENTRY', entryId: editingEntry.id, updates });
       }
-      // Update the source shortcut if this entry was recalled from one
-      if (activeShortcutRef.current) {
-        const finalValue = updates.value ?? editingEntry.value;
-        const finalOp = updates.op ?? editingEntry.op;
-        const triple = {};
-        if (editingEntry.text) triple.text = editingEntry.text;
-        if (finalValue != null) triple.value = finalValue;
-        if (finalOp) triple.op = finalOp;
-        dispatch({ type: 'SET_SHORTCUT_STORE', index: activeShortcutRef.current.index, data: triple });
-        activeShortcutRef.current = null;
-      }
       setInput('');
       if (isPrefix) setPendingOp(op !== '=' ? op : null);
       onDoneEditing();
@@ -268,16 +249,17 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
     if (op === '=') {
       const value = parseFloat(input);
       if (!isNaN(value) && input.trim() !== '') {
-        dispatch({ type: 'ADD_ENTRY_AND_TOTAL', value });
+        // First =: just commit the number, subtotal visible in running total
+        dispatch({ type: 'ADD_ENTRY', op: '+', value });
         setInput('');
       } else {
         const tape = appState.tapes.find((a) => a.id === activeTapeId)?.tape || [];
         const lastEntry = tape[tape.length - 1];
         if (lastEntry && lastEntry.op === '=') {
-          // s= followed by = → upgrade to T=
+          // Third =: upgrade s= to T=
           dispatch({ type: 'UPDATE_ENTRY', entryId: lastEntry.id, updates: { op: 'T' } });
         } else if (lastEntry && lastEntry.op !== 'T') {
-          // empty input + = → add s= (subtotal)
+          // Second =: add s= (subtotal)
           dispatch({ type: 'ADD_ENTRY', op: '=', value: 0 });
         }
       }
@@ -543,7 +525,6 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
         if (!e || (e.value == null && !e.text)) return null;
         const triple = {};
         if (e.value != null) triple.value = e.value;
-        if (e.op && e.op !== '=' && e.op !== 'T' && e.op !== 'text') triple.op = e.op;
         if (e.text) triple.text = e.text;
         return Object.keys(triple).length > 0 ? triple : null;
       })
@@ -556,13 +537,12 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
     const hasText = !!slot.text;
     const hasValue = slot.value != null;
     if (!hasText && !hasValue) return null;
-    const opLabel = slot.op && slot.op !== '+' ? OP_SYMBOLS[slot.op] || slot.op : '';
     return (
       <>
         {hasText && <span className={styles.shortcutText}>{slot.text}</span>}
         {hasValue && (
           <span className={styles.shortcutValue}>
-            {isPrefix ? opLabel + String(slot.value) : String(slot.value) + opLabel}
+            {String(slot.value)}
           </span>
         )}
       </>
@@ -570,28 +550,19 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
   }
 
   function shortcutSave(index) {
-    // Source: selected/editing entry, or last regular tape entry
-    let entry = editingEntry;
-    if (!entry) {
-      const tape = activeTape?.tape || [];
-      for (let i = tape.length - 1; i >= 0; i--) {
-        if (tape[i].op !== '=' && tape[i].op !== 'T' && tape[i].op !== 'text') {
-          entry = tape[i]; break;
-        }
-      }
-    }
-    if (!entry) return;
     const triple = {};
+    // Start from editingEntry if available (always get full entry)
+    if (editingEntry) {
+      if (editingEntry.value != null) triple.value = editingEntry.value;
+      if (editingEntry.text) triple.text = editingEntry.text;
+    }
+    // Input overrides: number if editing number, text if editing text
     const val = parseFloat(input);
-    if (!isNaN(val) && input.trim() !== '') {
+    if (editingMode === 'text' && input.trim()) {
+      triple.text = input.trim();
+    } else if (!isNaN(val) && input.trim() !== '') {
       triple.value = val;
-    } else if (entry.value != null) {
-      triple.value = entry.value;
     }
-    if (entry.op && entry.op !== '=' && entry.op !== 'T' && entry.op !== 'text') {
-      triple.op = entry.op;
-    }
-    if (entry.text) triple.text = entry.text;
     if (Object.keys(triple).length === 0) return;
     dispatch({ type: 'SET_SHORTCUT_STORE', index, data: triple });
   }
@@ -599,23 +570,27 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
   function shortcutRecall(index) {
     const stored = shortcutStores[index];
     if (!stored) return;
-    const newId = generateId();
-    const recallOp = isPrefix && pendingOp ? pendingOp : (stored.op || '+');
+    const recallOp = isPrefix && pendingOp ? pendingOp : '+';
     const entry = {
-      entryId: newId,
+      entryId: generateId(),
       op: recallOp,
       value: stored.value ?? null,
       ...(stored.text ? { text: stored.text } : {}),
     };
-    if (isEditing) {
+    if (editingEntry && editingEntry.value == null && !editingEntry.text) {
+      // Empty row (e.g. after NL) — fill it with shortcut data
+      const updates = { value: entry.value };
+      if (stored.text) updates.text = stored.text;
+      dispatch({ type: 'UPDATE_ENTRY', entryId: editingEntry.id, updates });
+      onDoneEditing();
+    } else if (isEditing) {
       dispatch({ type: 'INSERT_ENTRY', afterId: editingEntry.id, ...entry });
+      onDoneEditing();
     } else {
       dispatch({ type: 'ADD_ENTRY', ...entry });
     }
-    setInput(stored.value != null ? String(stored.value) : '');
+    setInput('');
     if (isPrefix) setPendingOp(null);
-    onSelectEntry(newId, 'number');
-    activeShortcutRef.current = { index, entryId: newId };
   }
 
   function enterShortcutsMode() {
@@ -624,7 +599,7 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
       .filter((s) => s)
       .map((s) => ({
         id: generateId(),
-        op: s.op || '+',
+        op: '+',
         value: s.value ?? null,
         ...(s.text ? { text: s.text } : {}),
         timestamp: Date.now(),
@@ -644,7 +619,6 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
       if (!e || (e.value == null && !e.text)) return null;
       const triple = {};
       if (e.value != null) triple.value = e.value;
-      if (e.op && e.op !== '=' && e.op !== 'T' && e.op !== 'text') triple.op = e.op;
       if (e.text) triple.text = e.text;
       return Object.keys(triple).length > 0 ? triple : null;
     });
@@ -664,10 +638,11 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
       clearTimeout(clearModeTimer.current);
       return;
     }
-    if (shortcutStores[index]) {
-      shortcutRecall(index);
-    } else {
+    const hasInput = input.trim() !== '';
+    if (hasInput) {
       shortcutSave(index);
+    } else {
+      shortcutRecall(index);
     }
   }
 
@@ -978,9 +953,11 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
 
   const isTextInput = editingMode === 'text' || keypadMode === 'tape' || keypadMode === 'total' || keypadMode === 'saves' || keypadMode === 'room';
 
+  const shortcutMode = clearMode ? 'CLR' : input.trim() !== '' ? 'STO' : 'RCL';
+
   function getDisplayLabel() {
-    if (isEditing && editingMode === 'text') return 'EDIT TEXT';
-    if (isEditing) return 'EDIT';
+    if (isEditing && editingMode === 'text') return `EDIT TEXT ${shortcutMode}`;
+    if (isEditing) return `EDIT ${shortcutMode}`;
     if (keypadMode === 'shortcuts') return 'SHORTCUTS';
     if (keypadMode === 'total') return '\u03A3 NAME';
     if (keypadMode === 'tape') return 'TAPE';
@@ -990,7 +967,8 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
     if (keypadMode === 'room') return 'ROOM';
     if (keypadMode === 'menu') return 'MENU';
     if (viewingTotal) return '\u03A3';
-    return formatValue(currentSubProduct !== null ? currentSubProduct : subtotal);
+    const total = formatValue(currentSubProduct !== null ? currentSubProduct : subtotal);
+    return `${total} ${shortcutMode}`;
   }
 
   const displayContent = (
