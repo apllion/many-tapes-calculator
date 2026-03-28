@@ -3,7 +3,7 @@ import styles from './TapeEntry.module.css';
 
 const OP_SYMBOLS = { '+': '+', '-': '\u2212', '*': '\u00d7', '/': '\u00f7' };
 
-export default function TapeEntry({ entry, resolvedText, runningTotal, subProduct, isSelected, editingMode, onSelect, settings, editingInput, clearMode, clearHighlight, onClearText, onClearNumber, isPrefix }) {
+export default function TapeEntry({ entry, runningTotal, subProduct, isSelected, editingMode, onSelect, settings, editingInput, clearMode, clearHighlight, onClearText, onClearNumber, isPrefix }) {
   const fmt = settings?.numberFormat;
   const displayValue = subProduct !== null ? subProduct : runningTotal;
   const isNegative = displayValue < 0;
@@ -18,7 +18,7 @@ export default function TapeEntry({ entry, resolvedText, runningTotal, subProduc
         onClick={() => onSelect(entry.id, 'text')}
       >
         <span className={styles.textContent}>
-          {resolvedText || entry.text}
+          {entry.text}
         </span>
       </div>
     );
@@ -43,7 +43,7 @@ export default function TapeEntry({ entry, resolvedText, runningTotal, subProduc
   // Live editing preview: override displayed text/value while typing
   const liveText = editingMode === 'text' && editingInput != null ? editingInput : null;
   const liveValue = editingMode === 'number' && editingInput != null ? parseFloat(editingInput) : null;
-  const displayText = liveText != null ? liveText : (resolvedText || entry.text);
+  const displayText = liveText != null ? liveText : entry.text;
   const shownValue = liveValue != null && !isNaN(liveValue) ? liveValue : entry.value;
 
   return (

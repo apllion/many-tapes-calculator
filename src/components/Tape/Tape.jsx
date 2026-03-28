@@ -11,15 +11,6 @@ export default function Tape({ tape, editingId, editingMode, onSelect, settings,
   const opPosition = settings?.operatorPosition;
   const { totals, subProducts } = computeRunningTotals(tape, settings?.calculationMode, opPosition);
 
-  // Compute # numbering for entries with text (text-only and labeled numeric)
-  const textCounts = {};
-  const resolvedTexts = tape.map((entry) => {
-    if (!entry.text?.includes('#')) return null;
-    const key = entry.text;
-    textCounts[key] = (textCounts[key] || 0) + 1;
-    return entry.text.replace('#', String(textCounts[key]));
-  });
-
   // Determine where the preview goes: after editingId, or at end
   const insertAfterIndex = editingId
     ? tape.findIndex((e) => e.id === editingId)
@@ -89,7 +80,6 @@ export default function Tape({ tape, editingId, editingMode, onSelect, settings,
             <Fragment key={entry.id}>
               <TapeEntry
                 entry={entry}
-                resolvedText={resolvedTexts[i]}
                 runningTotal={totals[i]}
                 subProduct={subProducts[i]}
                 isSelected={entry.id === editingId}

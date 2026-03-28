@@ -50,6 +50,7 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
   const colorRef = useRef(null);
   const colorIndexRef = useRef(null);
   const saveLongRef = useRef(null);
+  const shortcutLongRef = useRef(null);
   const savedTapeRef = useRef(null); // original tape entries while editing shortcuts
   const addedTotalRef = useRef(false);
   const isEditing = editingEntry !== null && editingMode !== null;
@@ -493,7 +494,7 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
   useEffect(() => {
     function onVisibilityChange() {
       if (document.visibilityState === 'visible') {
-        for (const ref of [saveLongRef, colorLongRef]) {
+        for (const ref of [saveLongRef, colorLongRef, shortcutLongRef]) {
           if (ref.current !== null) {
             if (ref.current !== 'fired') clearTimeout(ref.current);
             ref.current = null;
@@ -551,20 +552,39 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
 
   function shortcutSave(index) {
     const triple = {};
-    // Start from editingEntry if available (always get full entry)
+    // Start from editing entry
     if (editingEntry) {
       if (editingEntry.value != null) triple.value = editingEntry.value;
       if (editingEntry.text) triple.text = editingEntry.text;
     }
-    // Input overrides: number if editing number, text if editing text
+    // Input overrides the active field
     const val = parseFloat(input);
     if (editingMode === 'text' && input.trim()) {
       triple.text = input.trim();
     } else if (!isNaN(val) && input.trim() !== '') {
       triple.value = val;
     }
+    // If no text from input, keep existing shortcut's text and show it
+    const existing = shortcutStores[index];
+    if (!triple.text && existing?.text) {
+      triple.text = existing.text;
+    }
     if (Object.keys(triple).length === 0) return;
     dispatch({ type: 'SET_SHORTCUT_STORE', index, data: triple });
+    // Commit the full shortcut (text + number)
+    const updates = {};
+    if (triple.value != null) updates.value = triple.value;
+    if (triple.text) updates.text = triple.text;
+    if (isEditing) {
+      if (Object.keys(updates).length > 0) {
+        dispatch({ type: 'UPDATE_ENTRY', entryId: editingEntry.id, updates });
+      }
+      onDoneEditing();
+    } else if (triple.value != null) {
+      dispatch({ type: 'ADD_ENTRY', op: isPrefix && pendingOp ? pendingOp : '+', value: triple.value, ...(triple.text ? { text: triple.text } : {}) });
+    }
+    setInput('');
+    if (isPrefix) setPendingOp(null);
   }
 
   function shortcutRecall(index) {
@@ -630,9 +650,24 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
     setKeypadMode('normal');
   }
 
-  function onShortcutTap(index) {
+  function onShortcutDown(index) {
+    const slot = shortcutStores[index];
+    const isRcl = !clearMode && input.trim() === '';
+    if (isRcl && slot && slot.text && slot.value == null) {
+      shortcutLongRef.current = setTimeout(() => {
+        shortcutLongRef.current = 'fired';
+        dispatch({ type: 'ADD_ENTRY_ALL', op: 'text', value: null, text: slot.text });
+      }, 600);
+    }
+  }
+  function onShortcutUp(index) {
+    if (shortcutLongRef.current === 'fired') {
+      shortcutLongRef.current = null;
+      return;
+    }
+    clearTimeout(shortcutLongRef.current);
+    shortcutLongRef.current = null;
     if (clearMode && shortcutStores[index]) {
-      // C+shortcut: delete the shortcut
       dispatch({ type: 'CLEAR_SHORTCUT_STORE', index });
       setClearMode(false);
       clearTimeout(clearModeTimer.current);
@@ -644,6 +679,10 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
     } else {
       shortcutRecall(index);
     }
+  }
+  function onShortcutCancel() {
+    clearTimeout(shortcutLongRef.current);
+    shortcutLongRef.current = null;
   }
 
   function renderKeypad() {
@@ -1042,7 +1081,10 @@ export default function NumberInput({ dispatch, editingEntry, editingMode, onDon
           key={i}
           className={`${slot ? styles.shortcutBtn : styles.shortcutEmpty} ${clearMode && slot ? styles.clearModeTarget : ''}`}
           style={slot?.text && tapeColorByName[slot.text] ? { background: tapeColorByName[slot.text] + '30', color: tapeColorByName[slot.text], borderColor: tapeColorByName[slot.text] } : undefined}
-          onClick={() => onShortcutTap(i)}
+          onPointerDown={() => onShortcutDown(i)}
+          onPointerUp={() => onShortcutUp(i)}
+          onPointerCancel={onShortcutCancel}
+          onContextMenu={(e) => e.preventDefault()}
         >
           {shortcutPreview(slot)}
         </button>
